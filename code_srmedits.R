@@ -100,6 +100,45 @@ c1 <- ggsurvplot(survfit(
 
 c1 <- c1 + labs(x = "handling [seconds]", y = "Prop. failing to access sucrose")
 
+
+
+
+
+togeth2 =  subset(togeth, BeeID !=8)
+togeth2 %>%
+  ggplot() +
+  aes(x = time, y = resp, colour = env, group = env) +
+  geom_point(shape = "circle", size = 1.5) +
+  scale_color_hue(direction = 1) +
+  theme_minimal() +
+  facet_wrap(vars(trial))+
+  geom_smooth(method = "lm")
+
+togeth2 %>%
+ ggplot() +
+ aes(x = time, y = resp, colour = trial, group = trial) +
+ geom_point(shape = "circle", size = 1.5) +
+ scale_color_hue(direction = 1) +
+ theme_minimal()+
+  geom_smooth(method = "lm")
+
+ggplot(togeth) +
+  aes(x = time, y = resp, colour = env, group = env) +
+ geom_point(shape = "circle", size = 1.5) +
+ scale_color_hue(direction = 1) +
+ theme_minimal() +
+ facet_wrap(vars(trial), scales = "free")+
+  geom_smooth(method = "lm")
+
+ggplot(togeth) +
+ aes(x = time, y = resp, colour = trial, group = trial) +
+ geom_point(shape = "circle", size = 1.5) +
+ scale_color_hue(direction = 1) +
+ theme_minimal()+
+  geom_smooth(method = "lm")
+
+
+
 c2 <- ggsurvplot(survfit(
   coxph(Surv(cap2hand,cap2solve) ~ Env + diff45, data = bee3),
   data = bee3, newdata = env.dat),
