@@ -7,7 +7,7 @@ library(survminer)
 se <- function(x) sd(x)/sqrt(length(x)) #standard error function
 
 #read in data
-beeAll <- read.csv('C:/Users/David/Dropbox/David-Anna/TimNovelty/BeeInnovationData.csv', header = T)
+beeAll <- read.csv(url("https://raw.githubusercontent.com/shannonmcwaters/Innovation/main/BeeInnovationData.csv"))
 
 ################################################################################
 #subset data to relevant variables (will add additional variables from main dataset below; for now this simplifies things)
