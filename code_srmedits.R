@@ -101,8 +101,9 @@ c1 <- ggsurvplot(survfit(
 c1 <- c1 + labs(x = "handling [seconds]", y = "Prop. failing to access sucrose")
 
 
-
-
+bymedian = with(togeth, reorder(BeeID, time, median))
+boxplot(time~bymedian,data=togeth,ylim=c(0,60),col=c("grey","black")[as.factor(env)],pch=19)
+points(time~bymedian, data=togeth, col=c("blue","green","red","brown")[as.factor(trial)],pch=19)
 
 togeth2 =  subset(togeth, BeeID !=8)
 togeth2 %>%
