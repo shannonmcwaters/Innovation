@@ -121,7 +121,8 @@ togeth2 %>%
  geom_point(shape = "circle", size = 1.5) +
  scale_color_hue(direction = 1) +
  theme_minimal()+
-  geom_smooth(method = "lm")
+  geom_smooth(method = "lm")+
+  labs(x="Time to access reward (innovation)", y="Explorative-ness")
 
 ggplot(togeth) +
   aes(x = time, y = resp, colour = env, group = env) +
@@ -129,7 +130,8 @@ ggplot(togeth) +
  scale_color_hue(direction = 1) +
  theme_minimal() +
  facet_wrap(vars(trial), scales = "free")+
-  geom_smooth(method = "lm")
+  geom_smooth(method = "lm")+
+  labs(x="Time to access reward (innovation)", y="Explorative-ness")
 
 ggplot(togeth) +
  aes(x = time, y = resp, colour = trial, group = trial) +
