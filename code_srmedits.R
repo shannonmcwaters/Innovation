@@ -10,7 +10,7 @@ se <- function(x) sd(x)/sqrt(length(x)) #standard error function
 #read in data
 beeAll <- read.csv(url("https://raw.githubusercontent.com/shannonmcwaters/Innovation/main/BeeInnovationData.csv"))
 # Bee's that did failed to visit at least one of the trial flowers
-values_to_remove <- c("A10", "A98", "B182", "C32", "Y35", "Y60", "Y48","A69")
+values_to_remove <- c("A69")
 #Filter the dataframe to remove rows with matching BeeID values
 beeTrimmed <- beeAll %>%
   filter(!BeeID %in% values_to_remove)
@@ -36,20 +36,24 @@ bee3$cap2hand <- beeTrimmed$Cap2handling #handling time on 4th novel flower
 bee3$cap2solve <- as.numeric(as.factor(beeTrimmed$Cap2solve))-1 #binary: success on 4th novel flower
 
 #Combined Cox regression considering all flowers together
-Ta <- bee3[,c('Flower1handling', 'F1solve','Env','diff45')]
-names(Ta) <- c('time','solve','env','resp')
-Tb <- bee3[,c('F2hand', 'F2solve','Env','diff45')]
-names(Tb) <- c('time','solve','env','resp')
-Td <- bee3[,c('cap1hand', 'cap1solve','Env','diff45')]
-names(Td) <- c('time','solve','env','resp')
-Te <- bee3[,c('cap2hand', 'cap2solve','Env','diff45')]
-names(Te) <- c('time','solve','env','resp')
+ta <- bee3[,c('F1time', 'F1solve','Env','diff45')]
+names(ta) <- c('time','solve','env','resp')
+tb <- bee3[,c('F2time', 'F2solve','Env','diff45')]
+names(tb) <- c('time','solve','env','resp')
+td <- bee3[,c('cap1hand', 'cap1solve','Env','diff45')]
+names(td) <- c('time','solve','env','resp')
+te <- bee3[,c('cap2hand', 'cap2solve','Env','diff45')]
+names(te) <- c('time','solve','env','resp')
 
-Trimtogeth <- rbind(Ta,Tb,Td,Te)
-Trimtogeth$BeeID <- rep(1:31,4)
-Trimtogeth$trial <- rep(letters[22:25], each = 31)
+names = c("bumpy","folded","cap1","cap2")
+Trimtogeth <- rbind(ta,tb,td,te)
+Trimtogeth$BeeID <- rep(1:37,4)
+Trimtogeth$trial <- rep(names, each = 37)
 
-Trimmedmod <- coxme(Surv(time, solve) ~ env * trial + resp * trial + (1|BeeID), data = Trimtogeth)
+Trimtogeth <- Trimtogeth %>%
+  filter(time != 0)
+
+Trimmedmod <- coxme(Surv(time, solve) ~ env + resp + trial + (1|BeeID), data = Trimtogeth)
 Trimmedmod
 cox.zph(Trimmedmod)
 
