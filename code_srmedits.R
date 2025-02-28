@@ -10,7 +10,7 @@ se <- function(x) sd(x)/sqrt(length(x)) #standard error function
 #read in data
 beeAll <- read.csv(url("https://raw.githubusercontent.com/shannonmcwaters/Innovation/main/BeeInnovationData.csv"))
 # Bee's that did failed to visit at least one of the trial flowers
-values_to_remove <- c("A69")
+values_to_remove <- c("A69","A10")
 #Filter the dataframe to remove rows with matching BeeID values
 beeTrimmed <- beeAll %>%
   filter(!BeeID %in% values_to_remove)

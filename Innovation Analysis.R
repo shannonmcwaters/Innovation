@@ -7,7 +7,7 @@ library(ggplot2)#for plots
 library(dplyr)
 ####Data Wrangling####
 # Bee's that need to be removed from analysis
-bees_to_remove <- c("A69")
+bees_to_remove <- c("A69", "A10")
 #Filter the dataframe to remove rows with matching BeeID values
 beeTrimmed <- rawdat %>%
   filter(!BeeID %in% bees_to_remove)
@@ -39,8 +39,8 @@ Cap2 <- innovatedata[,c('cap2time', 'cap2solve','Env','resp')]
 names(Cap2) <- c('time','solve','env','resp')
 
 innovatedatalong <- rbind(Bumpy,Folded,Cap1,Cap2)
-innovatedatalong$BeeID <- rep(1:37,4)
-innovatedatalong$trial <- rep(letters[22:25], each = 37)
+innovatedatalong$BeeID <- rep(1:36,4)
+innovatedatalong$trial <- rep(letters[22:25], each = 36)
 # removing observations where the bee did not visit the flower
 innovatedatalong <- innovatedatalong %>%
   filter(time != 0)
