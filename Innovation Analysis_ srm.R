@@ -1,4 +1,4 @@
-rawdata <- read.csv(url("https://raw.githubusercontent.com/shannonmcwaters/Innovation/refs/heads/main/BeeInnovationData_full.csv"))
+rawdata <- read.csv(url("https://raw.githubusercontent.com/shannonmcwaters/Innovation/refs/heads/main/BeeInnovationDataRaw.csv"))
 ####packages####
 library(lme4) #needed for GLMMs
 library(lmerTest) #needed for obtaining p-values in lmm
@@ -34,12 +34,12 @@ calculate_repetition_index <- function(orders) {
 beeTrimmed <- beeTrimmed %>%
   group_by(BeeID) %>%
   mutate(SRI = calculate_repetition_index(c(T1_order, T2_order, T3_order, T4_order)))
-
+beeTrimmed$HB10 <- ifelse(!is.na(beeTrimmed$T5_HB), 1, 0)
 innovatedata <- beeTrimmed[,c('BeeID','Env','colony')]
 innovatedata$F1search <- beeTrimmed$Flower1search
 innovatedata$F2search <- beeTrimmed$Flower2search
 innovatedata$SRI <- beeTrimmed$SRI
-innovatedata$resp <- (beeTrimmed$T5_T - beeTrimmed$AvgPre)/beeTrimmed$AvgPre #differences between travel times for flowers 4 and 5
+innovatedata$resp <- (beeTrimmed$T5travel - beeTrimmed$AvgPre)/beeTrimmed$AvgPre #differences between travel times for flowers 4 and 5
 innovatedata$F1time <- beeTrimmed$Flower1handling   #total time for 1st novel flower
 innovatedata$F1solve <- as.numeric(as.factor(beeTrimmed$Flower1Solve))-1 #binary: success on 1st novel flower or not?
 innovatedata$F2time <- beeTrimmed$Flower2handling #total time on 2nd novel flower
@@ -48,7 +48,8 @@ innovatedata$cap1time <- beeTrimmed$Cap1.handling #handling time on 3rd novel fl
 innovatedata$cap1solve <- as.numeric(as.factor(beeTrimmed$Cap1solve))-1 #binary: success on 3rd novel flower
 innovatedata$cap2time <- beeTrimmed$Cap2handling #handling time on 4th novel flower
 innovatedata$cap2solve <- as.numeric(as.factor(beeTrimmed$Cap2solve))-1 #binary: success on 4th novel flower
-innovatedata$HB10 <- ifelse(!is.na(beeTrimmed$T5_HB), 1, 0)
+innovatedata$HB10 <- beeTrimmed$HB10
+innovatedata$H_F1_T1 <- beeTrimmed$H_F1_T1
 
 innovatedatalong <- innovatedata %>%
   pivot_longer(cols = c(F1time, F2time, cap1time, cap2time), 
@@ -67,25 +68,117 @@ innovatedatalong <- innovatedata %>%
     trial == "Cap2" ~ cap2solve
   )) %>%
   # Keep only necessary columns
-  select(BeeID, trial, time, solve, resp, HB10, SRI, Env, colony, F1search, F2search)
+  select(BeeID, trial, time, solve, resp, HB10, SRI, Env, colony, F1search, F2search,H_F1_T1)
 
 # removing observations where the bee did not visit the flower
-innovatedatalong <- innovatedatalong %>%
+innovatedatalongA <- innovatedatalong %>%
   filter(time != 0)
 
 # Calculate the proportion of 'no' values for each solve column
-prop_not_solved <- colSums(innovatedatalong[, "solve"] == "0") / nrow(innovatedatalong)
+prop_not_solved <- colSums(innovatedatalongA[, "solve"] == "0") / nrow(innovatedatalongA)
 # Calculate mean time for each trial type
-mean_times <- innovatedatalong %>%
+mean_times <- innovatedatalongA %>%
   group_by(trial) %>%
   summarise(mean_time = mean(time, na.rm = TRUE))
 
 #making datafram for those who solved
-innovatedatalong_solved <- innovatedatalong %>%
+innovatedatalong_solved <- innovatedatalongA %>%
   filter(solve =="1")
-####How does environment play a role in innovation####
-envmod = lm(time ~ Env + trial, data=innovatedatalong)
-summary(envmod)
+####How does environment play a role####
+bee_renamed <- beeTrimmed %>%
+  rename(
+    Flower1_handling = Flower1handling,
+    Flower2_handling = Flower2handling,
+    Cap1_handling = Cap1.handling,
+    Cap2_handling = Cap2handling,
+    Flower1_solve = Flower1Solve,
+    Flower2_solve = Flower2Solve,
+    Cap1_solve = Cap1solve,
+    Cap2_solve = Cap2solve
+  )
+
+# Step 2: Pivot to long format
+bee_long <- bee_renamed %>%
+  select(BeeID, Env,
+         Flower1_handling, Flower1_solve,
+         Flower2_handling, Flower2_solve,
+         Cap1_handling, Cap1_solve,
+         Cap2_handling, Cap2_solve) %>%
+  pivot_longer(
+    cols = -c(BeeID, Env),
+    names_to = c("flower", ".value"),
+    names_sep = "_"
+  ) %>%
+  mutate(
+    landed = ifelse(handling > 0, 1, 0),
+    solve = ifelse(solve == "yes", 1,
+                   ifelse(solve == "no", 0, NA))  # clean NAs if present
+  )
+
+glm_landing_fixed <- glm(landed ~ Env + flower, family = "binomial", data = bee_long)
+summary(glm_landing_fixed)
+
+#env and solving
+bee_landed <- bee_long %>% filter(landed == 1)
+env_mod = lm(handling~Env+flower,data=bee_landed)
+summary(env_mod)
+
+
+# Logistic regression
+glm_solve_all <- glm(solve ~ Env+flower, data = bee_landed, family = "binomial")
+summary(glm_solve_all)
+
+
+####personality and solving####
+trait_summary <- innovatedatalong %>%
+  mutate(landed = ifelse(time > 0, 1, 0)) %>%
+  group_by(BeeID) %>%
+  summarise(
+    prop_landed = mean(landed, na.rm = TRUE),
+    prop_solved = if (sum(landed) > 0) {
+      mean(solve[landed == 1], na.rm = TRUE)
+    } else {
+      NA_real_
+    },
+    SRI = first(SRI),
+    HB10 = first(HB10),
+    resp = first(resp),
+    Env = first(Env)
+  )
+
+#predcit landing
+model_SRI_landed <- lm(prop_landed ~ SRI, data = trait_summary)
+model_HB10_landed <- lm(prop_landed ~ HB10, data = trait_summary)
+model_resp_landed <- lm(prop_landed ~ resp, data = trait_summary)
+
+summary(model_SRI_landed)
+summary(model_HB10_landed)
+summary(model_resp_landed)
+
+trait_summaryA <- innovatedatalongA %>%
+  mutate(landed = ifelse(time > 0, 1, 0)) %>%
+  group_by(BeeID) %>%
+  summarise(
+    prop_landed = mean(landed, na.rm = TRUE),
+    prop_solved = if (sum(landed) > 0) {
+      mean(solve[landed == 1], na.rm = TRUE)
+    } else {
+      NA_real_
+    },
+    SRI = first(SRI),
+    HB10 = first(HB10),
+    resp = first(resp),
+    Env = first(Env)
+  )
+#predict solving
+model_SRI_solved <- lm(prop_solved ~ SRI, data = trait_summaryA)
+model_HB10_solved <- lm(prop_solved ~ HB10, data = trait_summaryA)
+model_resp_solved <- lm(prop_solved ~ resp, data = trait_summaryA)
+
+summary(model_SRI_solved)
+summary(model_HB10_solved)
+summary(model_resp_solved)
+
 ####Innovativeness as a personality trait####
 # Fit model with BeeID as random effect
 BeeID_mod <- lmer(time ~ trial + (1 | BeeID), data = innovatedatalong_solved)
@@ -100,73 +193,44 @@ var_residual <- attr(var_components, "sc")^2
 repeatability <- var_beeID / (var_beeID + var_residual)
 repeatability
 
-library(rptR)
 
-rpt_result <- rpt(time ~ (1 | BeeID), grname = "BeeID",
-                  data = innovatedatalong, datatype = "Gaussian",
-                  nboot = 1000, npermut = 1000)
-
-summary(rpt_result)
 ####individual traits predicting Innovativeness#### 
 #SRI
-sri_lm=lmer(time~SRI+trial+(1|BeeID), data=innovatedatalong_solved)
+sri_lm=lm(time~SRI * trial, data=innovatedatalong_solved)
 summary(sri_lm)
 #Resp
-resp_lm = lmer(time~resp+trial+(1|BeeID), data=innovatedatalong_solved)
+resp_lm = lm(time~resp*trial, data=innovatedatalong_solved)
 summary(resp_lm)
 #exploration
-exp_lm <- lmer(time~HB10+trial+(1|BeeID),data=innovatedatalong_solved)
+exp_lm <- lm(time~HB10 * trial,data=innovatedatalong_solved)
 summary(exp_lm)
 
-#summary(lm(avgInn~T5_HB + SRI,data=beeTrimmed))
+#handling time of first flower
+hand_lm <- lm(time~ H_F1_T1 +trial, data=innovatedatalongA)
+summary(hand_lm)
 
+####Search time###
+bumpy_folded_search <- innovatedatalongA %>%
+  filter(trial %in% c("Bumpy", "Folded")) %>%
+  mutate(
+    search_time = case_when(
+      trial == "Bumpy"  ~ F1search,
+      trial == "Folded" ~ F2search
+    )
+  ) %>%
+  select(BeeID, trial, search_time, everything())
+
+searchmod <- lm(time ~ search_time + trial, data = bumpy_folded_search)
+summary(searchmod)
+bee_avg_search <- bumpy_folded_search %>%
+  group_by(BeeID, Env) %>%
+  summarise(mean_search = mean(search_time, na.rm = TRUE), .groups = "drop")
+wilcox.test(mean_search ~ Env, data = bee_avg_search)
 ####trial anova/ tukey####
 trial <- aov(time ~ trial, data = innovatedatalong)
 TukeyHSD(trial)
 
-####Search time####
-bee_search <- beeTrimmed %>%
-  select(BeeID, Env, 
-         Flower1search, Flower2search, 
-         Flower1handling, Flower2handling) %>%
-  pivot_longer(
-    cols = c(Flower1search, Flower2search, Flower1handling, Flower2handling),
-    names_to = c("flower", ".value"),
-    names_pattern = "(Flower[12])(search|handling)"
-  ) %>%
-  mutate(
-    flower = case_when(
-      flower == "Flower1" ~ "Flower 1",
-      flower == "Flower2" ~ "Flower 2"
-    ),
-    total_time = search + handling
-  )
-search_mod <- lm(search ~ Env + flower, data = bee_search)
-summary(search_mod)
-search_mod <- lm(total_time ~ Env + flower, data = bee_search)
-summary(search_mod)
 
-
-
-
-
-
-# Step 1: Sort within bee by trial (assuming trial order is chronological)
-handling_pairs <- innovatedatalong %>%
-  arrange(BeeID, trial) %>%
-  group_by(BeeID) %>%
-  slice_head(n = 2) %>%  # get first two trials per bee
-  mutate(trial_number = row_number()) %>%
-  ungroup()
-
-# Step 2: Pivot to wide format (1 row per bee)
-handling_wide <- handling_pairs %>%
-  select(BeeID, trial_number, time) %>%
-  pivot_wider(names_from = trial_number, values_from = time, names_prefix = "time")
-
-# Spearman correlation (rank-based, more robust)
-cor.test(handling_wide$time1, handling_wide$time2, method = "spearman")
-cor.test(handling_wide$time3, handling_wide$time4, method = "spearman")
 
 
 

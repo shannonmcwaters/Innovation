@@ -55,20 +55,200 @@ bee_avg <- innovatedatalong %>%
   )
 
 # Step 2: Reshape for faceted plot
-bee_long <- bee_avg %>%
+bee_longplot <- bee_avg %>%
   pivot_longer(cols = c(SRI, resp, HB10), names_to = "trait", values_to = "score") %>%
   mutate(trait = recode(trait,
                         SRI = "Routine-ness (SRI)",
                         resp = "Responsiveness",
                         HB10 = "Exploration"))
 
-# Step 3: Make the 3-panel plot
-ggplot(bee_long, aes(x = score, y = avg_time)) +
+library(scales)  # for number_format()
+
+# Step 1: Reorder the 'trait' factor
+bee_longplot <- bee_longplot %>%
+  mutate(trait = factor(trait, 
+                        levels = c("Responsiveness", "Routine-ness (SRI)", "Exploration")))
+
+# Step 2: Plot with formatted x-axis and reordered facets
+ggplot(bee_longplot, aes(x = score, y = avg_time)) +
   geom_point(alpha = 0.7) +
   geom_smooth(method = "lm", se = TRUE) +
   facet_wrap(~ trait, scales = "free_x") +
+  scale_x_continuous(labels = number_format(accuracy = 0.1)) +
   labs(
     x = "Trait score",
     y = "Mean solving time (s)"
   ) +
+  theme_minimal(base_size = 20) +
+  theme(
+    axis.title = element_text(size = 22),
+    axis.text = element_text(size = 20),
+    legend.title = element_text(size = 20),
+    legend.text = element_text(size = 18)
+  )
+
+
+####barplot for land and solve####
+library(dplyr)
+library(ggplot2)
+
+# STEP 1: Summarize landing outcomes
+landing_summary <- bee_long %>%
+  filter(!is.na(landed)) %>%
+  group_by(Env, outcome = ifelse(landed == 1, "Landed", "Did not land")) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  mutate(category = "Landing")
+
+# STEP 2: Summarize solving outcomes (only for bees that landed)
+solve_summary <- bee_long %>%
+  filter(landed == 1 & !is.na(solve)) %>%
+  group_by(Env, outcome = ifelse(solve == 1, "Solved", "Did not solve")) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  mutate(category = "Solving")
+
+# STEP 3: Combine
+plot_data <- bind_rows(landing_summary, solve_summary)
+
+# STEP 4: Set outcome as a factor to control legend order
+plot_data$outcome <- factor(
+  plot_data$outcome,
+  levels = c("Did not land", "Landed", "Did not solve", "Solved")
+)
+
+# STEP 5: Define muted custom colors
+custom_colors <- c(
+  "Did not land" = "#c7d6d5",
+  "Landed" = "#5a9a8f",
+  "Did not solve" = "#d4c1e3",
+  "Solved" = "#7b6ea8"
+)
+
+# STEP 6: Plot
+sample_sizes <- plot_data %>%
+  group_by(Env, category) %>%
+  summarise(total = sum(count), .groups = "drop") %>%
+  mutate(label = paste0("n = ", total))
+
+ggplot(plot_data, aes(x = Env, y = count, fill = outcome)) +
+  geom_col(position = "fill", width = 0.6) +
+  facet_wrap(~ category, scales = "free_x") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  scale_fill_manual(values = custom_colors) +
+  scale_x_discrete(labels = c("c" = "Complex", "s" = "Simple"))+
+  labs(
+    x = "Environment",
+    y = "Proportion of bees",
+    fill = NULL
+  ) +
+  theme_minimal(base_size = 20) +
+  theme(
+    axis.title = element_text(size = 22),
+    axis.text = element_text(size = 20),
+    legend.title = element_text(size = 20),
+    legend.text = element_text(size = 18)
+  ) +
+  theme(
+    legend.position = "top",
+    legend.title = element_blank(),
+    strip.text = element_text(size = 14)
+  ) +
+  geom_text(
+    aes(label = count),
+    position = position_fill(vjust = 0.5),
+    color = "black",  # <-- black text labels
+    size = 4
+  ) +
+  geom_text(  # Optional: asterisk annotation
+    data = data.frame(Env = "s", category = "Landing", count = 1.05),
+    aes(x = Env, y = count, label = "*"),
+    inherit.aes = FALSE,
+    size = 8
+  )
+
+
+####traits and land/solve ####
+library(tidyverse)
+
+# Step 1: Reshape data to long format
+trait_long <- trait_summary %>%
+  select(BeeID, Env,SRI, HB10, resp, prop_landed, prop_solved) %>%
+  pivot_longer(cols = c(SRI, HB10, resp), names_to = "trait", values_to = "score") %>%
+  pivot_longer(cols = c(prop_landed, prop_solved), names_to = "outcome", values_to = "prop") %>%
+  mutate(
+    trait = recode(trait,
+                   SRI = "Routine-ness (SRI)",
+                   HB10 = "Exploration",
+                   resp = "Responsiveness"),
+    outcome = recode(outcome,
+                     prop_landed = "Proportion landed",
+                     prop_solved = "Proportion solved")
+  )
+trait_long <- trait_long %>%
+  mutate(
+    trait = factor(trait, levels = c("Responsiveness", "Routine-ness (SRI)", "Exploration")),
+    outcome = factor(outcome, levels = c("Proportion landed", "Proportion solved"))
+  )
+# Step 2: Plot
+ggplot(trait_long, aes(x = score, y = prop, shape = Env)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(aes(group = 1), method = "lm", se = FALSE, color = "black") +
+  facet_grid(rows = vars(outcome), cols = vars(trait), scales = "free_x", switch = "y") +
+  scale_x_continuous(labels = number_format(accuracy = 0.1), n.breaks = 5) +
+  labs(x = NULL, y = NULL) +
+  theme_minimal(base_size = 14) +
+  scale_shape_manual(
+    values = c("c" = 16, "s" = 17),  # same shapes you want
+    labels = c("c" = "Complex", "s" = "Simple"),
+    name = "Environment"
+  )+
+  theme(
+    strip.placement = "outside",
+    strip.text.y.left = element_text(angle = 90, size = 14),
+    strip.text.x = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    panel.spacing = unit(1, "lines"),
+    legend.title = element_text(size = 14),
+    legend.text = element_text(size = 12)
+  )
+
+####Search time and innovation ####
+ggplot(bumpy_folded_search, aes(x = search_time, y = time, color = trial)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(
+    x = "Search time",
+    y = "Solving Time",
+    color = "Trial"
+  ) +
   theme_minimal(base_size = 14)
+
+####env and search####
+
+ggplot(bee_avg_search, aes(x = Env, y = mean_search, fill = Env)) +
+  geom_boxplot(width = 0.6, alpha = 0.7, coef = Inf) +
+  labs(
+    x = "Environment",
+    y = "Mean search time per bee"
+  ) +
+  scale_fill_manual(
+    values = c("s" = "#66c2a5", "c" = "#fc8d62"),
+    labels = c("s" = "Simple", "c" = "Complex")
+  ) +
+  scale_x_discrete(labels = c("s" = "Simple", "c" = "Complex")) +
+  theme_minimal(base_size = 20) +
+  theme(
+    axis.title = element_text(size = 22),
+    axis.text = element_text(size = 20),
+    legend.position = "none",
+  )
+
+#handling time first flower
+ggplot(innovatedatalong, aes(x = H_F1_T1, y = time, color = trial)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    x = "Handling Time on First Flower",
+    y = "Time to Solve Novel Flower"
+  ) +
+  theme_minimal(base_size = 14) +
+  scale_color_brewer(palette = "Set2")
