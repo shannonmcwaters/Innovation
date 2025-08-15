@@ -24,6 +24,11 @@ innovatedatalong$Env <- factor(innovatedatalong$Env, levels = c("s", "c"))
 ggplot(innovatedatalong, aes(x = factor(trial, levels = c("Bumpy", "Folded", "Cap1", "Cap2")),
                              y = time, fill = Env)) +
   geom_boxplot(coef = Inf, position = position_dodge(width = 0.75)) +
+  scale_fill_manual(
+    values = c("c" = "#c7d6d5", "s" = "#d4c1e3"),
+    labels = c("Complex", "Simple"),
+    name = "Environment"
+  )+
   theme_minimal() +
   labs(x = "Trial", y = "Time to Solve") +
   theme(
