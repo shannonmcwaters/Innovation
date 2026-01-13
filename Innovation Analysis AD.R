@@ -76,14 +76,15 @@ innovation <- innovatedatalong %>%
 abandoning <- innovatedatalong %>%
   filter(solve != 1)
 
-## ANALYSIS -------------------------------------------
+## ANALYSES -------------------------------------------
+
 ####Did the bee solve?####
 # env is simple or complex
 # trial is flower type
 # resp is responsiveness
-solve_mod<- glm(solve ~ env + resp + trial, 
-                    data = innovatedatalong, 
-                    family = binomial)
+solve_mod<- glmer(solve ~ env + trial + (1|BeeID), 
+                  data = innovatedatalong, 
+                  family = binomial)
 summary(solve_mod)
 
 # Obtain estimated marginal means (EMMs) for 'trial'
@@ -96,9 +97,14 @@ summary(pairwise_comparisons)
 # Result all comparisons n.s.
 
 ####Time to solve####
+# Descriptive:
+hist(innovation$time)
+# Note that time to solve has a steeply decreasing, long tail distribution -
+# suitable for a log transformation
+
 innovation$logtime <- log(innovation$time)
-innovation_mod <- lm(logtime ~ env + resp * trial,
-                       data = innovation)
+innovation_mod <- lmer(logtime ~ env + trial + (1|BeeID),
+                        data = innovation)
 summary(innovation_mod)
 
 # Obtain estimated marginal means (EMMs) for 'trial'
@@ -108,66 +114,25 @@ pairwise_comparisons2 <- contrast(innovmeans, method = "pairwise")
 # Summary of pairwise comparisons
 summary(pairwise_comparisons2)
 
-# Result: bumpy=folded but significantly different from cap1=cap2
-
-innovmeans <- emmeans(innovation_mod, ~ env)
-# Perform pairwise comparisons between trials
-pairwise_comparisons3 <- contrast(innovmeans, method = "pairwise")
-# Summary of pairwise comparisons
-summary(pairwise_comparisons3)
-
-# Result: complex significantly different than simple
+# Results: 
+#  env sign - complex significantly different than simple
+#  trial (=flower type) sign
+#   bumpy=folded but significantly different from cap1=cap2
 
 
-#Plot ave times per trial#
-ggplot(innovation, aes(x = trial, y = time, fill = env)) +
-  geom_boxplot(outlier.shape = NA, coef = Inf) +  # Remove outliers and extend whiskers
-  scale_fill_manual(values = c("c" = "white", "s" = "grey"), 
-                    labels = c("simple", "complex")) +  # Update legend labels
-  labs(x = "Trial", y = "Time to solve (seconds)", fill = "Environment") +  # Change the legend title to "Type"
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  scale_x_discrete(labels = c("bumpy", "folded", "cap1", "cap2"))
-
-#look at trials separately with responsiveness#
-average_time_data <- innovation %>%
-  group_by(trial, resp, env) %>%
-  summarize(avg_time = mean(time, na.rm = TRUE), .groups = 'drop')
-
-# Plot with a 2x2 matrix of scatterplots and lines of best fit
-ggplot(average_time_data, aes(x = resp, y = avg_time, color = env)) +
-  geom_point(size = 3, shape = 1) +  # Open circles for average time
-  geom_smooth(method = "lm", se = FALSE, aes(color = env)) +  # Line of best fit without confidence interval
-  labs(x = "Responsiveness", y = "Time to solve (seconds)", color = "Environment") +
-  facet_wrap(~ trial, ncol = 2, labeller = as_labeller(c("v" = "bumpy", "w" = "folded", "x" = "cap1", "y" = "cap2"))) +  # 2x2 matrix of plots
-  scale_color_manual(values = simplecomplexcolors) +  # Colorblind-friendly palette
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-###Time to give up####
+####Time to give up####
+# Descriptive:
 hist(abandoning$time)
-abandoning_mod <- lm(time ~ env + resp + trial, 
+# Note that time to give up seems bimodal, with some very short and some very long times
+
+abandoning_mod <- lmer(time ~ env + trial + (1|BeeID), 
                        data = abandoning)
 summary(abandoning_mod)
-#removing trial as the trials are unevenly represented and there is only one observation for trial v
-abandoning_mod2 <- lm(time ~ env + resp,
+#removing trial as the trials are unevenly represented and there is only one observation for one trial
+abandoning_mod2 <- lm(time ~ env + (1|BeeID),
                        data = abandoning)
 summary(abandoning_mod2)
 
-#plot
-ggplot(abandoning, aes(x = trial, y = time)) +
-  geom_boxplot(outlier.shape = NA, alpha = 0.5, position = position_dodge(width = 0.75)) +  # Boxplot without outliers, semi-transparent
-  geom_jitter(aes(shape = env), size = 3, position = position_dodge(width = 0.75)) +  # Jitter points for better visibility
-  labs(x = "Trial", y = "Time to give up", color = "Environment", shape = "Environment") +
-  scale_shape_manual(values = c("c" = 16, "s" = 17), labels = c("complex", "simple")) +  # Update shape legend
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  scale_x_discrete(labels = c("bumpy", "folded", "cap1", "cap2"))
+# Result: either way env not significant
+# trial is, but unevenly represented
 
-ggplot(innovation, aes(x = resp, y = time, fill = env)) +
-  geom_boxplot(outlier.shape = NA, coef = Inf) +  # Remove outliers and extend whiskers
-  scale_fill_manual(values = c("c" = "white", "s" = "grey"), 
-                    labels = c("complex", "simple")) +  # Update legend labels
-  labs(x = "Trial", y = "Time to solve (seconds)", fill = "Environment") +  # Change the legend title to "Type"
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
