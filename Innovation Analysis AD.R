@@ -31,6 +31,7 @@ beeTrimmed <- rawdat %>%
 innovatedata <- beeTrimmed[,c('BeeID','Env','colony')]
 #BeeID: unique id number for each bee
 #env: whether the bee was subject to a simple or complex environment
+innovatedata$Env <- factor(innovatedata$Env, levels = c("s", "c"))
 #colony: colony id
 no_bees <- length(unique(innovatedata$BeeID))
 
@@ -47,6 +48,7 @@ innovatedata$cap1solve <- as.numeric(as.factor(beeTrimmed$Cap1solve))-1 #binary:
 innovatedata$cap2time <- beeTrimmed$Cap2handling #handling time on 4th novel flower
 innovatedata$cap2solve <- as.numeric(as.factor(beeTrimmed$Cap2solve))-1 #binary: success on 4th novel flower
 
+
 # Extract columns for specific flower types
 Bumpy <- innovatedata[,c('F1time', 'F1solve','Env','resp')]
 names(Bumpy) <- c('time','solve','env','resp')
@@ -61,6 +63,7 @@ names(Cap2) <- c('time','solve','env','resp')
 innovatedatalong <- rbind(Bumpy,Folded,Cap1,Cap2)
 innovatedatalong$BeeID <- rep(1:no_bees,4)
 innovatedatalong$trial <- rep(c("Bumpy", "Fold", "Cap1", "Cap2"), each = no_bees)
+innovatedatalong$trial <- factor(as.factor(innovatedatalong$trial), levels = c("Bumpy", "Fold", "Cap1", "Cap2"))
 
 # removing observations where the bee did not visit the flower
 innovatedatalong <- innovatedatalong %>%
@@ -105,11 +108,22 @@ pairwise_comparisons2 <- contrast(innovmeans, method = "pairwise")
 # Summary of pairwise comparisons
 summary(pairwise_comparisons2)
 
+# Result: bumpy=folded but significantly different from cap1=cap2
+
+innovmeans <- emmeans(innovation_mod, ~ env)
+# Perform pairwise comparisons between trials
+pairwise_comparisons3 <- contrast(innovmeans, method = "pairwise")
+# Summary of pairwise comparisons
+summary(pairwise_comparisons3)
+
+# Result: complex significantly different than simple
+
+
 #Plot ave times per trial#
 ggplot(innovation, aes(x = trial, y = time, fill = env)) +
   geom_boxplot(outlier.shape = NA, coef = Inf) +  # Remove outliers and extend whiskers
   scale_fill_manual(values = c("c" = "white", "s" = "grey"), 
-                    labels = c("complex", "simple")) +  # Update legend labels
+                    labels = c("simple", "complex")) +  # Update legend labels
   labs(x = "Trial", y = "Time to solve (seconds)", fill = "Environment") +  # Change the legend title to "Type"
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
