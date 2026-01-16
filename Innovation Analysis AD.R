@@ -5,17 +5,15 @@
 
 # Paper reference: XXX (to be updated on acceptance of the paper)
 ### PAPER VERSION    DRAFT
-### PART I: DATA IMPORT, FORMATTING, AND ANALYSIS
+### PART I: DATA IMPORT, FORMATTING, AND ANALYSES
 
 ### Libraries ------------------
 library(lme4) #needed for GLMMs
 library(lmerTest) #needed for obtaining p-values in lmm
 library(emmeans) #post-hoc comparisons
-library(ggplot2) #for plots
-library(dplyr)
 library(coxme)
 library(stringdist)
-library(tidyr)
+library(tidyverse)
 
 #### IMPORT DATA -----------------------------------
 # Raw data are csv file in same folder
@@ -45,6 +43,10 @@ calculate_repetition_index <- function(orders) {
 #### Data Wrangling ---------------------------------
 
 beedata <- rawdata
+#BeeID: unique id number for each bee
+#colony: colony id
+no_bees <- length(unique(beedata$BeeID))
+
 # Calculate average time spent traveling over trips 2-4 in the pre-training 
 beedata$AvgPre <- rowMeans(beedata[,c("T2_T","T3_T","T4_T")], na.rm=TRUE)
 
@@ -56,10 +58,6 @@ beedata <- beedata %>%
 # Define exploration as whether or not bees landed on blue flowers in trial 5 
 beedata$HB10 <- ifelse(!is.na(beedata$T5_HB), 1, 0)
 
-#BeeID: unique id number for each bee
-#colony: colony id
-no_bees <- length(unique(beedata$BeeID))
-
 #env: whether the bee was subject to a simple or complex environment
 beedata$env <- factor(beedata$Env, levels = c("s", "c"))
 
@@ -67,27 +65,30 @@ beedata$env <- factor(beedata$Env, levels = c("s", "c"))
 #  Flower1search: time to alight on first novel flower
 #  Flower1handling: time spent drinking (head in first novel flower)
 #  resp: responsiveness
+beedata$resp <- (beedata$T5travel - beedata$AvgPre)/beedata$AvgPre #differences between travel times for trip 5 and avg of trips before
 beedata$F1search <- beedata$Flower1search
 beedata$F2search <- beedata$Flower2search
-beedata$resp <- (beedata$T5travel - beedata$T4travel)/beedata$T4travel #differences between travel times for flowers 4 and 5
-beedata$F1time <- beedata$Flower1handling + beedata$Flower1search #total time for 1st novel flower
 beedata$F1solve <- as.numeric(as.factor(beedata$Flower1Solve))-1 #binary: success on 1st novel flower or not?
-beedata$F2time <- beedata$Flower2handling + beedata$Flower2search #total time on 2nd novel flower
 beedata$F2solve <- as.numeric(as.factor(beedata$Flower2Solve))-1 #binary: success on 2nd novel flower
-beedata$cap1time <- beedata$Cap1.handling #handling time on 3rd novel flower
 beedata$cap1solve <- as.numeric(as.factor(beedata$Cap1solve))-1 #binary: success on 3rd novel flower
-beedata$cap2time <- beedata$Cap2handling #handling time on 4th novel flower
 beedata$cap2solve <- as.numeric(as.factor(beedata$Cap2solve))-1 #binary: success on 4th novel flower
+beedata$F1time <- ifelse(beedata$F1solve == 1, beedata$Flower1handling, NA) # solving time for 1st novel flower
+beedata$F2time <- ifelse(beedata$F2solve == 1, beedata$Flower2handling, NA) # solving time on 2nd novel flower
+beedata$cap1time <- ifelse(beedata$cap1solve == 1, beedata$Cap1.handling, NA) # solving time on 3rd novel flower
+beedata$cap2time <- ifelse(beedata$cap2solve == 1, beedata$Cap2handling, NA) # solving time on 4th novel flower
+beedata$landed1 <- ifelse(beedata$Flower1handling>0, 1, 0)
+beedata$landed2 <- ifelse(beedata$Flower2handling>0, 1, 0)
+beedata$landed3 <- ifelse(beedata$Cap1.handling>0, 1, 0)
+beedata$landed4 <- ifelse(beedata$Cap2handling>0, 1, 0)
+beedata$F1givinguptime <- ifelse(beedata$landed1 & beedata$F1solve == 0, beedata$Flower1handling, NA) # giving up time for 1st novel flower
+beedata$F2givinguptime <- ifelse(beedata$landed2 & beedata$F2solve == 0, beedata$Flower2handling, NA) # giving up time on 2nd novel flower
+beedata$cap1givinguptime <- ifelse(beedata$landed3 & beedata$cap1solve == 0, beedata$Cap1.handling, NA) # giving up time on 3rd novel flower
+beedata$cap2givinguptime <- ifelse(beedata$landed4 & beedata$cap2solve == 0, beedata$Cap2handling, NA) # giving up time on 4th novel flower
 
-# Extract columns for specific flower types
-Bumpy <- beedata[,c('F1time', 'F1solve','env','resp')]
-names(Bumpy) <- c('time','solve','env','resp')
-Folded <- beedata[,c('F2time', 'F2solve','env','resp')]
-names(Folded) <- c('time','solve','env','resp')
-Cap1 <- beedata[,c('cap1time', 'cap1solve','env','resp')]
-names(Cap1) <- c('time','solve','env','resp')
-Cap2 <- beedata[,c('cap2time', 'cap2solve','env','resp')]
-names(Cap2) <- c('time','solve','env','resp')
+# Calculate the proportion of successful landings and successful solving per bee
+beedata$prop_landed <- rowSums(cbind(beedata$landed1, beedata$landed2, beedata$landed3, beedata$landed4), na.rm = TRUE) / 4
+beedata$prop_solved <- rowSums(cbind(beedata$F1solve, beedata$F2solve, beedata$cap1solve, beedata$cap2solve), na.rm = TRUE) / 4
+beedata$avg_time <- rowMeans(cbind(beedata$F1time, beedata$F2time, beedata$cap1time, beedata$cap2time), na.rm = TRUE)
 
 # Now we construct the main data frame for analysis:
 # Collage all the data for each flower type in one long data frame, i.e. separate row for each flower type and bee trip
@@ -107,8 +108,12 @@ innovationlong <- beedata %>%
     trial == "Cap1" ~ cap1solve,
     trial == "Cap2" ~ cap2solve
   )) %>%
-  # Keep only necessary columns
-  select(BeeID, trial, time, solve, resp, HB10, SRI, env, colony, F1search, F2search,H_F1_T1)
+  mutate(landed = case_when(
+    trial == "Bumpy" ~ landed1,
+    trial == "Folded" ~ landed2,
+    trial == "Cap1" ~ landed3,
+    trial == "Cap2" ~ landed4
+  ))
 
 innovationlong$trial <- factor(innovationlong$trial, levels = c("Bumpy", "Folded", "Cap1", "Cap2"))
 
@@ -118,22 +123,32 @@ hist(innovationlong$time)
 # suitable for a log transformation
 innovationlong$logtime <- log(innovationlong$time)
 
+## Now we have all the data in long format - one bee trial per row - and in 
+## wide format - one bee per row, with all the trials.
+
+# We're also going to make a separate 'long' table of abandoning times
+abandonedinnovation <- beedata %>%
+  pivot_longer(cols = c(F1givinguptime, F2givinguptime, cap1givinguptime, cap2givinguptime), 
+               names_to = "trial", 
+               values_to = "givinguptime") %>%
+  mutate(trial = recode(trial, 
+                        "F1givinguptime" = "Bumpy", 
+                        "F2givinguptime" = "Folded", 
+                        "cap1givinguptime" = "Cap1", 
+                        "cap2givinguptime" = "Cap2")) 
+
+## Subsets --------------------------------------------------
+
 # Removing observations where the bee did not visit the flower
-innovationlong$landed <- ifelse(innovationlong$time != 0, TRUE, FALSE)
 innovationlanded <- innovationlong %>%
-  filter(landed)
+  filter(landed != 0)
 
 # Make data frame for just the time to solve 
 innovationsuccess <- innovationlanded %>%
   filter(solve != 0)
 
-abandonedinnovation <- innovationlanded %>%
-  filter(solve != 1)
 
 #### SUMMARIES ------------------------------
-
-# Calculate the proportion of 'no' values for each solve column
-prop_not_solved <- colSums(innovationlanded[, "solve"] == "0") / nrow(innovationlanded)
 
 # Calculate mean solving time for each trial type
 mean_times <- innovationsuccess %>%
@@ -176,9 +191,8 @@ summary(env_mod)
 
 # On time to give up:
 # Descriptive:
-hist(abandonedinnovation$time)
-# Note that time to give up seems bimodal, with some very short and some very long times
-abandoning_mod <- lm(time ~ env + trial, 
+hist(abandonedinnovation$givinguptime)
+abandoning_mod <- lm(givinguptime ~ env + trial, 
                        data = abandonedinnovation)
 summary(abandoning_mod)
 
@@ -195,35 +209,19 @@ wilcox.test(mean_search ~ env, data = bee_avg_search)
 # For landing (yes/no) and solving (yes/no), we use one data point per bee, to 
 # calculate proportion of time landing/solving. 
 
-# Make summary data table where each bee is only one row again
-trait_summary <- innovationlong %>%
-  group_by(BeeID) %>%
-  summarise(
-    prop_landed = mean(landed, na.rm = TRUE),
-    prop_solved = if (sum(landed) > 0) {
-      mean(solve[landed == 1], na.rm = TRUE)
-    } else {
-      NA_real_
-    },
-    SRI = first(SRI),
-    HB10 = first(HB10),
-    resp = first(resp),
-    env = first(env)
-  )
-
 # On landing:
-model_SRI_landed <- lm(prop_landed ~ SRI, data = trait_summary)
-model_HB10_landed <- lm(prop_landed ~ HB10, data = trait_summary)
-model_resp_landed <- lm(prop_landed ~ resp, data = trait_summary)
+model_SRI_landed <- lm(prop_landed ~ SRI, data = beedata)
+model_HB10_landed <- lm(prop_landed ~ HB10, data = beedata)
+model_resp_landed <- lm(prop_landed ~ resp, data = beedata)
 summary(model_SRI_landed)
 summary(model_HB10_landed)
 summary(model_resp_landed)
 # Again, not a lot of cases of not landing, so not really expecting an effect
 
 # On solving:
-model_SRI_solved <- lm(prop_solved ~ SRI, data = trait_summary)
-model_HB10_solved <- lm(prop_solved ~ HB10, data = trait_summary)
-model_resp_solved <- lm(prop_solved ~ resp, data = trait_summary)
+model_SRI_solved <- lm(prop_solved ~ SRI, data = beedata)
+model_HB10_solved <- lm(prop_solved ~ HB10, data = beedata)
+model_resp_solved <- lm(prop_solved ~ resp, data = beedata)
 summary(model_SRI_solved)
 summary(model_HB10_solved)
 summary(model_resp_solved)
