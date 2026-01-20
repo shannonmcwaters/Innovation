@@ -183,12 +183,18 @@ bee_longplot <- beedata %>%
   mutate(trait = recode(trait,
                         SRI = "Routine formation (SRI)",
                         resp = "Responsiveness",
-                        HB10 = "Exploration")
+                        HB10 = "Exploration",
+                        H_F1_T1 = "Standard handling time",
+                        tot_search12 = "Search Time")
          , outcome = recode(outcome,
                             prop_landed = "Proportion landed",
                             prop_solved = "Proportion solved")
   ) %>%
-  mutate(trait = factor(trait, levels = c("Responsiveness", "Routine formation (SRI)", "Exploration"))
+  mutate(trait = factor(trait, levels = c("Standard handling time",
+                                          "Search Time", 
+                                          "Routine formation (SRI)",
+                                          "Responsiveness",
+                                          "Exploration"))
          , outcome = factor(outcome, levels = c("Proportion landed", "Proportion solved"))
   )
 
@@ -277,7 +283,7 @@ ggplot(plot_data, aes(x = env, y = count, fill = outcome)) +
   )
 
 
-##### On time to solve: -------------------------------
+# On time to solve: -------------------------------
 env_mod <- lm(logtime ~ env + trial, data = innovationlanded)
 summary(env_mod)
 
@@ -447,11 +453,13 @@ summary(hand_lm)
 # Search time in first two innovation trials on solving time in those trials
 searchmod <- lm(logtime ~ log(search_time) + trial, data = bumpy_folded_search)
 summary(searchmod)
+# !! Shouldn't we use avg innovation time as above?
 
 # FIGURE 5 ---------------------------------------------
-# !!!!! should include 5 plots, all vertical in a row
-# !!!!! probably something wrong with trait labeling in table
-# Plot with formatted x-axis and reordered facets
+# !!!!! should all vertical in a row
+# Would it be better to plot solving time on log axis, and/or 
+# with error bars? 
+# Units on x-axis reformatted?
 ggplot(bee_longplot, aes(x = score, y = avg_time, color = env)) +
   geom_point(alpha = 0.7) +
   scale_color_manual(values = c("s" = simcomcolors_dark[1], "c" = simcomcolors_dark[2]),
@@ -480,7 +488,6 @@ ggplot(bee_longplot, aes(x = score, y = avg_time, color = env)) +
 BeeID_mod <- lmer(logtime ~ trial + (1 | BeeID), data = innovationsuccess)
 BeeID_mod2 <- lm(logtime ~ trial, data = innovationsuccess)
 anova(BeeID_mod, BeeID_mod2)
-
 # Get variance components
 var_components <- VarCorr(BeeID_mod)
 # Extract the variance components
@@ -489,6 +496,12 @@ var_residual <- attr(var_components, "sc")^2
 # Calculate repeatability
 repeatability <- var_beeID / (var_beeID + var_residual)
 repeatability
+#### EFFECT OF FLOWER TYPE ----------------------------
+# On time to solve:
+trialmod <- aov(logtime ~ trial, data = innovationsuccess)
+summary(trialmod)
+TukeyHSD(trialmod)
+
 
 
 #### ALT Analysis ----------------------------------------
@@ -517,10 +530,4 @@ innovmeans <- emmeans(innovation_mod, ~ trial)
 pairwise_comparisons2 <- contrast(innovmeans, method = "pairwise")
 # Summary of pairwise comparisons
 summary(pairwise_comparisons2)
-
-#### EFFECT OF FLOWER TYPE ----------------------------
-# On time to solve:
-trialmod <- aov(logtime ~ trial, data = innovationsuccess)
-summary(trialmod)
-TukeyHSD(trialmod)
 
