@@ -5,7 +5,6 @@
 
 # Paper reference: XXX (to be updated on acceptance of the paper)
 ### PAPER VERSION    DRAFT
-### PART I: DATA IMPORT, FORMATTING, AND ANALYSES
 
 ### Libraries ------------------
 library(lme4) #needed for GLMMs
