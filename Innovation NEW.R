@@ -380,6 +380,12 @@ ggplot(bee_avg_search, aes(x = env, y = mean_search, fill = env)) +
   )
 # !!!!! Add sample sizes
 
+#### EFFECT OF FLOWER TYPE ----------------------------
+# On time to solve:
+trialmod <- aov(logtime ~ trial, data = innovationsuccess)
+summary(trialmod)
+TukeyHSD(trialmod)
+
 #### EFFECT OF BEE TRAITS ----------------------------
 
 # For landing (yes/no) and solving (yes/no) ---------------
@@ -401,6 +407,7 @@ model_resp_solved <- lm(prop_solved ~ resp, data = beedata)
 summary(model_SRI_solved)
 summary(model_HB10_solved)
 summary(model_resp_solved)
+## !!!!! Add models for the other individual traits?
 
 # FIGURE S3 ------------------------------------------
 ## This needs work (see manuscript)
@@ -434,23 +441,23 @@ ggplot(bee_longplot, aes(x = score, y = prop, color = env)) +
 # but only trials in which the bee actually solved (i.e. accessed reward).
 
 # SRI (routine formation)
-sri_lm <- lm(logtime ~ SRI + trial, data = innovationsuccess)
+sri_lm <- lm(logtime ~ SRI * trial, data = innovationsuccess)
 summary(sri_lm)
 
 # Responsiveness
-resp_lm <- lm(logtime ~ resp + trial, data = innovationsuccess)
+resp_lm <- lm(logtime ~ resp * trial, data = innovationsuccess)
 summary(resp_lm)
 
 # Exploration
-exp_lm <- lm(logtime ~ HB10 + trial,data = innovationsuccess)
+exp_lm <- lm(logtime ~ HB10 * trial,data = innovationsuccess)
 summary(exp_lm)
 
 # Handling time of first flower
-hand_lm <- lm(logtime ~ log(H_F1_T1) + trial, data = innovationsuccess)
+hand_lm <- lm(logtime ~ log(H_F1_T1) * trial, data = innovationsuccess)
 summary(hand_lm)
 
 # Search time in first two innovation trials on solving time in those trials
-searchmod <- lm(logtime ~ log(search_time) + trial, data = bumpy_folded_search)
+searchmod <- lm(logtime ~ log(search_time) * trial, data = bumpy_folded_search)
 summary(searchmod)
 # !! Shouldn't we use avg innovation time as above?
 
@@ -495,11 +502,7 @@ var_residual <- attr(var_components, "sc")^2
 # Calculate repeatability
 repeatability <- var_beeID / (var_beeID + var_residual)
 repeatability
-#### EFFECT OF FLOWER TYPE ----------------------------
-# On time to solve:
-trialmod <- aov(logtime ~ trial, data = innovationsuccess)
-summary(trialmod)
-TukeyHSD(trialmod)
+
 
 
 
