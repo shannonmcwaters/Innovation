@@ -259,7 +259,7 @@ ggplot(plot_data, aes(x = env, y = count, fill = outcome)) +
   scale_x_discrete(labels = c("c" = "Complex", "s" = "Simple"))+
   labs(
     x = "Environment",
-    y = "Proportion of bees",
+    y = "Proportion of observations",
     fill = NULL
   ) +
   theme_minimal(base_size = 20) +
@@ -283,8 +283,9 @@ ggplot(plot_data, aes(x = env, y = count, fill = outcome)) +
 
 
 # On time to solve: -------------------------------
-env_mod <- lm(logtime ~ env + trial, data = innovationlanded)
+env_mod <- lm(logtime ~ env * trial, data = innovationsuccess)
 summary(env_mod)
+# Trial sign, not env, whether or not we include interaction
 
 # FIGURE 4 --------------------------------------------
 
@@ -305,7 +306,7 @@ ggplot(graph_data, aes(x = factor(trial, levels = c("Bumpy", "Folded", "Cap1", "
     name = "Environment"
   )+
   theme_minimal() +
-  labs(x = "Trial", y = "Time to Solve") +
+  labs(x = "Trial", y = "Time to Solve [s]") +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1, size = 14),
     axis.text.y = element_text(size = 14),
@@ -407,7 +408,9 @@ model_resp_solved <- lm(prop_solved ~ resp, data = beedata)
 summary(model_SRI_solved)
 summary(model_HB10_solved)
 summary(model_resp_solved)
-## !!!!! Add models for the other individual traits?
+# Nothing sign
+## !!!!! BUT: add models for the other individual traits!
+
 
 # FIGURE S3 ------------------------------------------
 ## This needs work (see manuscript)
@@ -443,23 +446,28 @@ ggplot(bee_longplot, aes(x = score, y = prop, color = env)) +
 # SRI (routine formation)
 sri_lm <- lm(logtime ~ SRI * trial, data = innovationsuccess)
 summary(sri_lm)
+# Sign SRI and interaction SRI x trialCap1
 
 # Responsiveness
 resp_lm <- lm(logtime ~ resp * trial, data = innovationsuccess)
 summary(resp_lm)
+# Sign interaction resp x trialFolded
 
 # Exploration
 exp_lm <- lm(logtime ~ HB10 * trial,data = innovationsuccess)
 summary(exp_lm)
+# Not sign
 
 # Handling time of first flower
 hand_lm <- lm(logtime ~ log(H_F1_T1) * trial, data = innovationsuccess)
 summary(hand_lm)
+# Close to sign
 
 # Search time in first two innovation trials on solving time in those trials
 searchmod <- lm(logtime ~ log(search_time) * trial, data = bumpy_folded_search)
 summary(searchmod)
 # !! Shouldn't we use avg innovation time as above?
+# Not sign
 
 # FIGURE 5 ---------------------------------------------
 # !!!!! should all vertical in a row
@@ -477,7 +485,7 @@ ggplot(bee_longplot, aes(x = score, y = avg_time, color = env)) +
   scale_x_continuous(labels = number_format(accuracy = 0.1)) +
   labs(
     x = "Trait score",
-    y = "Mean solving time for each bee (s)"
+    y = "Mean solving time for each bee [s]"
   ) +
   theme_minimal(base_size = 16) +
   theme(
@@ -502,7 +510,7 @@ var_residual <- attr(var_components, "sc")^2
 # Calculate repeatability
 repeatability <- var_beeID / (var_beeID + var_residual)
 repeatability
-
+# Repeatability is zero
 
 
 
@@ -532,4 +540,5 @@ innovmeans <- emmeans(innovation_mod, ~ trial)
 pairwise_comparisons2 <- contrast(innovmeans, method = "pairwise")
 # Summary of pairwise comparisons
 summary(pairwise_comparisons2)
+# Cap1 & Cap2 are different but env is not sign
 
