@@ -14,6 +14,7 @@ library(coxme)
 library(stringdist)
 library(tidyverse)
 library(scales)  # for number_format
+library(sjPlot)
 
 # Graphics setup -----------------------------
 
@@ -126,7 +127,9 @@ innovationlong <- beedata %>%
 innovationlong$trial <- factor(innovationlong$trial, levels = c("Bumpy", "Folded", "Cap1", "Cap2"))
 
 # Descriptive:
-hist(innovationlong$time)
+hist(innovationlong$time
+     , xlab = "Time to solve [s]"
+     , main = "Distribution of 'Innovation' outcomes across all trials")
 # Note that time to solve has a steeply decreasing, long tail distribution -
 # suitable for a log transformation
 innovationlong$logtime <- log(innovationlong$time)
@@ -202,15 +205,39 @@ bee_longplot <- beedata %>%
 #### EFFECT OF ENVIRONMENT ----------------------------
 
 ###### On landing: ------------------------------------
-glm_landing_fixed <- glm(landed ~ env + trial, family = "binomial", data = innovationlong)
-summary(glm_landing_fixed)
+glm_landing <- glm(landed ~ env + trial, family = "binomial", data = innovationlong)
+summary(glm_landing)
 # p=0.48 for env
 # trial n.s.
 
+# Output table for supplementary
+tab_model(glm_landing
+          , show.re.var = TRUE
+          , pred.labels = c("Intercept",
+                          "Environment (complex vs simple)",
+                          "Trial (Folded vs Bumpy)",
+                          "Trial (Cap1 vs Bumpy)",
+                          "Trial (Cap2 vs Bumpy)"
+                          )
+          , dv.labels = "Effect on landing on novel flower"
+)
+
 ###### On solving: ------------------------------------
-glm_solve_all <- glm(solve ~ env + trial, data = innovationlanded, family = "binomial")
-summary(glm_solve_all)
+glm_solving <- glm(solve ~ env + trial, data = innovationlanded, family = "binomial")
+summary(glm_solving)
 # nothing sign
+tab_model(glm_solving
+          , show.re.var = TRUE
+          , pred.labels = c("Intercept",
+                            "Environment (complex vs simple)",
+                            "Trial (Folded vs Bumpy)",
+                            "Trial (Cap1 vs Bumpy)",
+                            "Trial (Cap2 vs Bumpy)"
+          )
+          , dv.labels = "Effect on solving novel flower"
+)
+
+
 
 # FIGURE 3 -----------------------------------
 
@@ -283,9 +310,20 @@ ggplot(plot_data, aes(x = env, y = count, fill = outcome)) +
 
 
 # On time to solve: -------------------------------
-env_mod <- lm(logtime ~ env * trial, data = innovationsuccess)
-summary(env_mod)
+lm_time_to_solve <- lm(logtime ~ env + trial, data = innovationsuccess)
+summary(lm_time_to_solve)
 # Trial sign, not env, whether or not we include interaction
+tab_model(lm_time_to_solve
+          , show.re.var = TRUE
+          , pred.labels = c("Intercept",
+                            "Environment (complex vs simple)",
+                            "Trial (Folded vs Bumpy)",
+                            "Trial (Cap1 vs Bumpy)",
+                            "Trial (Cap2 vs Bumpy)"
+          )
+          , dv.labels = "Effect on time to solve (reach reward) on novel flower"
+)
+
 
 # FIGURE 4 --------------------------------------------
 
@@ -329,9 +367,23 @@ ggplot(graph_data, aes(x = factor(trial, levels = c("Bumpy", "Folded", "Cap1", "
 
 
 # On time to give up: ---------------------------------------------
-abandoning_mod <- lm(givinguptime ~ env + trial, 
+lm_abandoning <- lm(givinguptime ~ env + trial, 
                        data = abandonedinnovation)
-summary(abandoning_mod)
+summary(lm_abandoning)
+tab_model(lm_abandoning
+          , show.re.var = TRUE
+          , pred.labels = c("Intercept",
+                            "Environment (complex vs simple)",
+                            "Trial (Folded vs Bumpy)",
+                            "Trial (Cap1 vs Bumpy)",
+                            "Trial (Cap2 vs Bumpy)"
+          )
+          , dv.labels = "Effect on abandoning flower without solving"
+)
+
+# FIGURE S1 --------------------------------------------------
+## Would be nice to do the same formatted plot as for innovation time here
+##!!!!!!!!!!!!!!!!!
 
 graph_data <- subset(abandonedinnovation, givinguptime >0)
 graph_data$trial_factor <- factor(graph_data$trial, levels = c("Bumpy", "Folded", "Cap1", "Cap2"))
@@ -340,9 +392,6 @@ offset <- 0.2
 N_s <- table(subset(graph_data, env=="s")$trial_factor)
 N_c <- table(subset(graph_data, env=="c")$trial_factor)
 
-# FIGURE S1 --------------------------------------------------
-## Would be nice to do the same formatted plot as for innovation time here
-##!!!!!!!!!!!!!!!!!
 Nice_Plot <- boxplot(givinguptime ~ trial_factor, data = graph_data)
 nbGroup <- nlevels(as.factor(Nice_Plot$names))
 text( 
@@ -397,19 +446,26 @@ TukeyHSD(trialmod)
 model_SRI_landed <- lm(prop_landed ~ SRI, data = beedata)
 model_HB10_landed <- lm(prop_landed ~ HB10, data = beedata)
 model_resp_landed <- lm(prop_landed ~ resp, data = beedata)
+model_firsthandl_landed <- lm(prop_landed ~ H_F1_T1, data = beedata)
+model_searchtime_landed <- lm(prop_landed ~ tot_search12, data = beedata)
+
 summary(model_SRI_landed)
 summary(model_HB10_landed)
 summary(model_resp_landed)
+summary(model_firsthandl_landed)
+summary(model_searchtime_landed) # only one sign
 
 # On solving:
 model_SRI_solved <- lm(prop_solved ~ SRI, data = beedata)
 model_HB10_solved <- lm(prop_solved ~ HB10, data = beedata)
 model_resp_solved <- lm(prop_solved ~ resp, data = beedata)
+model_firsthandl_solved <- lm(prop_solved ~ H_F1_T1, data = beedata)
+model_searchtime_solved <- lm(prop_solved ~ tot_search12, data = beedata)
 summary(model_SRI_solved)
 summary(model_HB10_solved)
 summary(model_resp_solved)
-# Nothing sign
-## !!!!! BUT: add models for the other individual traits!
+summary(model_firsthandl_solved)
+summary(model_searchtime_solved) # only one sign
 
 
 # FIGURE S3 ------------------------------------------
@@ -447,6 +503,19 @@ ggplot(bee_longplot, aes(x = score, y = prop, color = env)) +
 sri_lm <- lm(logtime ~ SRI * trial, data = innovationsuccess)
 summary(sri_lm)
 # Sign SRI and interaction SRI x trialCap1
+tab_model(sri_lm
+          , show.re.var = TRUE
+          , pred.labels = c("Intercept",
+                            "SRI (Routine formation)",
+                            "Trial (Folded vs Bumpy)",
+                            "Trial (Cap1 vs Bumpy)",
+                            "Trial (Cap2 vs Bumpy)",
+                            "SRI x Trial (Folded)",
+                            "SRI x Trial (Cap1)",
+                            "SRI x Trial (Cap2)"
+          )
+          , dv.labels = "Effect on solving time"
+)
 
 # Responsiveness
 resp_lm <- lm(logtime ~ resp * trial, data = innovationsuccess)
