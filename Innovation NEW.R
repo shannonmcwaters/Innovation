@@ -324,7 +324,6 @@ tab_model(lm_time_to_solve
           , dv.labels = "Effect on time to solve (reach reward) on novel flower"
 )
 
-
 # FIGURE 4 --------------------------------------------
 
 # Boxplot of innovation time for each trial
@@ -449,11 +448,11 @@ model_resp_landed <- lm(prop_landed ~ resp, data = beedata)
 model_firsthandl_landed <- lm(prop_landed ~ H_F1_T1, data = beedata)
 model_searchtime_landed <- lm(prop_landed ~ tot_search12, data = beedata)
 
-summary(model_SRI_landed)
-summary(model_HB10_landed)
-summary(model_resp_landed)
 summary(model_firsthandl_landed)
 summary(model_searchtime_landed) # only one sign
+summary(model_SRI_landed)
+summary(model_resp_landed)
+summary(model_HB10_landed)
 
 # On solving:
 model_SRI_solved <- lm(prop_solved ~ SRI, data = beedata)
@@ -461,11 +460,11 @@ model_HB10_solved <- lm(prop_solved ~ HB10, data = beedata)
 model_resp_solved <- lm(prop_solved ~ resp, data = beedata)
 model_firsthandl_solved <- lm(prop_solved ~ H_F1_T1, data = beedata)
 model_searchtime_solved <- lm(prop_solved ~ tot_search12, data = beedata)
-summary(model_SRI_solved)
-summary(model_HB10_solved)
-summary(model_resp_solved)
 summary(model_firsthandl_solved)
 summary(model_searchtime_solved) # only one sign
+summary(model_SRI_solved)
+summary(model_resp_solved)
+summary(model_HB10_solved)
 
 
 # FIGURE S3 ------------------------------------------
@@ -521,6 +520,19 @@ tab_model(sri_lm
 resp_lm <- lm(logtime ~ resp * trial, data = innovationsuccess)
 summary(resp_lm)
 # Sign interaction resp x trialFolded
+tab_model(resp_lm
+          , show.re.var = TRUE
+          , pred.labels = c("Intercept",
+                            "Responsiveness",
+                            "Trial (Folded vs Bumpy)",
+                            "Trial (Cap1 vs Bumpy)",
+                            "Trial (Cap2 vs Bumpy)",
+                            "resp x Trial (Folded)",
+                            "resp x Trial (Cap1)",
+                            "resp x Trial (Cap2)"
+          )
+          , dv.labels = "Effect on solving time"
+)
 
 # Exploration
 exp_lm <- lm(logtime ~ HB10 * trial,data = innovationsuccess)
@@ -531,6 +543,19 @@ summary(exp_lm)
 hand_lm <- lm(logtime ~ log(H_F1_T1) * trial, data = innovationsuccess)
 summary(hand_lm)
 # Close to sign
+tab_model(hand_lm
+          , show.re.var = TRUE
+          , pred.labels = c("Intercept",
+                            "First handling time",
+                            "Trial (Folded vs Bumpy)",
+                            "Trial (Cap1 vs Bumpy)",
+                            "Trial (Cap2 vs Bumpy)",
+                            "First hand x Trial (Folded)",
+                            "First hand x Trial (Cap1)",
+                            "First hand x Trial (Cap2)"
+          )
+          , dv.labels = "Effect on solving time"
+)
 
 # Search time in first two innovation trials on solving time in those trials
 searchmod <- lm(logtime ~ log(search_time) * trial, data = bumpy_folded_search)
