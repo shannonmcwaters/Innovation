@@ -400,6 +400,52 @@ text(
   , xpd=TRUE
 #  , col = color_with_memory  
 )
+### ggplot version
+ggplot(graph_data, aes(x = trial_factor,
+                       y = givinguptime, fill = factor(Env, levels = c("s", "c")))) +
+  geom_boxplot(position = position_dodge(width = 0.75)) +
+  scale_fill_manual(
+    values = c("s" = simplecomplexcolors[1], "c" = simplecomplexcolors[2]),
+    labels = c("Simple", "Complex"),
+    name = "Environment"
+  )+
+  theme_minimal() +
+  labs(x = "Trial", y = "Time to give up") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 14),
+    axis.text.y = element_text(size = 14),
+    axis.title = element_text(size = 16),
+    legend.text = element_text(size = 14),
+    legend.title = element_text(size = 16)
+  ) +
+  annotate("text", x = 1, y = ymax + 2, label = "A", size = 5, color = "black") +
+  annotate("text", x = 2, y = ymax + 2, label = "A", size = 5, color = "black") +
+  annotate("text", x = 3, y = ymax + 2, label = "B", size = 5, color = "black") +
+  annotate("text", x = 4, y = ymax + 2, label = "B", size = 5, color = "black") +
+  annotate("text", x = 1+offset, y = - 2, label = N_c[[1]], size = 5, color = simcomcolors_dark[2]) +
+  annotate("text", x = 2+offset, y = - 2, label = N_c[[2]], size = 5, color = simcomcolors_dark[2]) +
+  annotate("text", x = 3+offset, y = - 2, label = N_c[[3]], size = 5, color = simcomcolors_dark[2]) +
+  annotate("text", x = 4+offset, y = - 2, label = N_c[[4]], size = 5, color = simcomcolors_dark[2]) +
+  annotate("text", x = 1-offset, y = - 2, label = N_s[[1]], size = 5, color = simcomcolors_dark[1]) +
+  annotate("text", x = 2-offset, y = - 2, label = N_s[[2]], size = 5, color = simcomcolors_dark[1]) +
+  annotate("text", x = 3-offset, y = - 2, label = N_s[[3]], size = 5, color = simcomcolors_dark[1]) +
+  annotate("text", x = 4-offset, y = - 2, label = N_s[[4]], size = 5, color = simcomcolors_dark[1]) 
+
+
+# On time to give up: ---------------------------------------------
+lm_abandoning <- lm(givinguptime ~ env + trial, 
+                    data = abandonedinnovation)
+summary(lm_abandoning)
+tab_model(lm_abandoning
+          , show.re.var = TRUE
+          , pred.labels = c("Intercept",
+                            "Environment (complex vs simple)",
+                            "Trial (Folded vs Bumpy)",
+                            "Trial (Cap1 vs Bumpy)",
+                            "Trial (Cap2 vs Bumpy)"
+          )
+          , dv.labels = "Effect on abandoning flower without solving"
+)
 
 # On search time: -------------------------------
 bee_avg_search <- bumpy_folded_search %>%
