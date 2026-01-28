@@ -186,13 +186,13 @@ bee_longplot <- beedata %>%
                         SRI = "Routine formation (SRI)",
                         resp = "Responsiveness",
                         HB10 = "Exploration",
-                        H_F1_T1 = "Standard handling time",
+                        H_F1_T1 = "First handling time",
                         tot_search12 = "Search Time")
          , outcome = recode(outcome,
                             prop_landed = "Proportion landed",
                             prop_solved = "Proportion solved")
   ) %>%
-  mutate(trait = factor(trait, levels = c("Standard handling time",
+  mutate(trait = factor(trait, levels = c("First handling time",
                                           "Search Time", 
                                           "Routine formation (SRI)",
                                           "Responsiveness",
@@ -312,7 +312,6 @@ ggplot(plot_data, aes(x = env, y = count, fill = outcome)) +
 # On time to solve: -------------------------------
 lm_time_to_solve <- lm(logtime ~ env + trial, data = innovationsuccess)
 summary(lm_time_to_solve)
-# Trial sign, not env, whether or not we include interaction
 tab_model(lm_time_to_solve
           , show.re.var = TRUE
           , pred.labels = c("Intercept",
