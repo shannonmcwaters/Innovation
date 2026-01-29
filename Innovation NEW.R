@@ -15,7 +15,7 @@ library(stringdist)
 library(tidyverse)
 library(scales)  # for number_format
 library(sjPlot)
-
+library(ggh4x) #for formatting individual x-axes in grid plot
 # Graphics setup -----------------------------
 
 ## Colorpalette
@@ -126,10 +126,35 @@ innovationlong <- beedata %>%
 
 innovationlong$trial <- factor(innovationlong$trial, levels = c("Bumpy", "Folded", "Cap1", "Cap2"))
 
-# Descriptive:
+# Descriptive (Fig S5?):
 hist(innovationlong$time
      , xlab = "Time to solve [s]"
      , main = "Distribution of 'Innovation' outcomes across all trials")
+#ggplot version with line at median
+ggplot(
+  innovationlong |> dplyr::filter(!is.na(time), time > 0),
+  aes(x = time)
+) +
+  geom_histogram(
+    bins = 10,
+    fill = "grey80",
+    color = "black"
+  ) +
+  geom_vline(
+    xintercept = median(innovationlong$time[innovationlong$time > 0], na.rm = TRUE),
+    linetype = "dashed",
+    linewidth = 0.8
+  ) +
+  scale_x_continuous(
+    limits = c(0.5, NA),
+    breaks = seq(0, 60, by = 10)
+  ) +
+  labs(
+    title = "Distribution of innovation solving times across all trials",
+    x = "Time to solve (s)",
+    y = "Frequency"
+  ) +
+  theme_classic(base_size = 14)
 # Note that time to solve has a steeply decreasing, long tail distribution -
 # suitable for a log transformation
 innovationlong$logtime <- log(innovationlong$time)
@@ -518,20 +543,56 @@ summary(model_HB10_solved)
 ggplot(bee_longplot, aes(x = score, y = prop, color = env)) +
   geom_point(alpha = 0.7) +
   geom_smooth(aes(group = 1), method = "lm", se = FALSE, color = "black") +
-  facet_grid(rows = vars(outcome), cols = vars(trait), scales = "free_x", switch = "y") +
-  scale_x_continuous(labels = number_format(accuracy = 0.1), n.breaks = 5) +
+  facet_grid(
+    rows = vars(outcome),
+    cols = vars(trait),
+    scales = "free_x",
+    switch = "y"
+  ) +
+  ggh4x::facetted_pos_scales(
+    x = list(
+      # FORCE 0 to appear + axis starts at 0 for this facet
+      trait == "First handling time" ~ scale_x_continuous(
+        limits = c(0, NA),
+        breaks = c(0, 5, 10, 15, 20),
+        labels = label_number(accuracy = 1)
+      ),
+      
+      trait == "Search Time" ~ scale_x_continuous(
+        breaks = pretty_breaks(n = 3),
+        labels = label_number(big.mark = ",", accuracy = 1)
+      ),
+      
+      trait == "Routine formation (SRI)" ~ scale_x_continuous(
+        breaks = c(0.3, 0.5, 0.7),
+        labels = label_number(accuracy = 0.1)
+      ),
+      
+      trait == "Responsiveness" ~ scale_x_continuous(
+        breaks = c(-0.5, 0, 0.5, 1.0),
+        labels = label_number(accuracy = 0.1)
+      ),
+      
+      trait == "Exploration" ~ scale_x_continuous(
+        breaks = c(0, 0.5, 1),
+        labels = label_number(accuracy = 0.1)
+      )
+    )
+  ) +
   labs(x = "Trait score", y = NULL) +
   theme_minimal(base_size = 14) +
-  scale_color_manual(values = c("s" = simcomcolors_dark[1], "c" = simcomcolors_dark[2]),
-                     labels = c("s" = "Simple", "c" = "Complex"),
-                     name = "Environment"
+  scale_color_manual(
+    values = c("s" = simcomcolors_dark[1], "c" = simcomcolors_dark[2]),
+    labels = c("s" = "Simple", "c" = "Complex"),
+    name = "Environment"
   ) +
   theme(
     strip.placement = "outside",
     strip.text.y.left = element_text(angle = 90, size = 14),
     strip.text.x = element_text(size = 14),
     axis.title = element_text(size = 14),
-    axis.text = element_text(size = 12),
+    axis.text.x = element_text(size = 10, angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 12),
     panel.spacing = unit(1, "lines"),
     legend.title = element_text(size = 14),
     legend.text = element_text(size = 12)
@@ -615,25 +676,26 @@ summary(searchmod)
 # Units on x-axis reformatted?
 ggplot(bee_longplot, aes(x = score, y = avg_time, color = env)) +
   geom_point(alpha = 0.7) +
-  scale_color_manual(values = c("s" = simcomcolors_dark[1], "c" = simcomcolors_dark[2]),
-                     labels = c("Simple", "Complex"),
-                     name = "Environment"
-  ) +
   geom_smooth(method = "lm", se = TRUE) +
-  facet_wrap(~ trait, scales = "free_x") +
-  scale_x_continuous(labels = number_format(accuracy = 0.1)) +
+  facet_wrap(~ trait, scales = "free_x", nrow = 1) +
+  scale_y_log10() +
+  scale_color_manual(
+    values = c("s" = simcomcolors_dark[1], 
+               "c" = simcomcolors_dark[2]),
+    labels = c("Simple", "Complex"),
+    name = "Environment"
+  ) +
   labs(
-    x = "Trait score",
-    y = "Mean solving time for each bee [s]"
+    x = NULL,
+    y = "Mean solving time for each bee (s, log scale)"
   ) +
   theme_minimal(base_size = 16) +
   theme(
-    axis.title = element_text(size = 22),
+    axis.title.y = element_text(size = 22),
     axis.text = element_text(size = 10),
     legend.title = element_text(size = 12),
     legend.text = element_text(size = 10)
   )
-
 
 
 # Bee IDs ----------------------------------
