@@ -266,7 +266,7 @@ bee_longplot$zscore <- (bee_longplot$score - meanvals[bee_longplot$trait])/sdval
 
 #### EFFECT OF ENVIRONMENT ----------------------------
 
-###### On landing: ------------------------------------
+###### On landing: Table S1 ------------------------------------
 glm_landing <- glm(landed ~ env + trial, family = "binomial", data = innovationlong)
 summary(glm_landing)
 # p=0.48 for env
@@ -284,7 +284,7 @@ tab_model(glm_landing
           , dv.labels = "Effect on landing on novel flower"
 )
 
-###### On solving: ------------------------------------
+###### On solving: Table S2 ------------------------------------
 glm_solving <- glm(solve ~ env + trial, data = innovationlanded, family = "binomial")
 summary(glm_solving)
 # nothing sign
@@ -371,7 +371,7 @@ ggplot(plot_data, aes(x = env, y = count, fill = outcome)) +
   )
 
 
-# On time to solve: -------------------------------
+# On time to solve: Table S3 -------------------------------
 lm_time_to_solve <- lm(logtime ~ env * trial, data = innovationsuccess)
 summary(lm_time_to_solve)
 tab_model(lm_time_to_solve
@@ -428,7 +428,7 @@ ggplot(graph_data, aes(x = trial, y = time, fill = env)) +
   annotate("text", x = 4-offset, y = 0.9, label = N_s[[4]], size = 5, color = simcomcolors_dark[1]) 
 
 
-# On time to give up: ---------------------------------------------
+# On time to give up: Table S4 ---------------------------------------------
 lm_abandoning <- lm(givinguptime ~ env + trial, 
                        data = abandonedinnovation)
 summary(lm_abandoning)
@@ -440,7 +440,7 @@ tab_model(lm_abandoning
                             "Trial (Cap1 vs Bumpy)",
                             "Trial (Cap2 vs Bumpy)"
           )
-          , dv.labels = "Effect on abandoning flower without solving"
+          , dv.labels = "Effect on the time to abandon a flower without solving"
 )
 
 # FIGURE S2 --------------------------------------------------
@@ -477,11 +477,15 @@ ggplot(graph_data, aes(x = trial_factor,
 
 
 # On other bee traits: -------------------------------
+wilcox.test(H_F1_T1 ~ env, data = beedata)
+wilcox.test(tot_search12 ~ env, data = beedata)
+wilcox.test(avgtravel ~ env, data = beedata)
+wilcox.test(SRI ~ env, data = beedata)
+wilcox.test(resp ~ env, data = beedata)
+wilcox.test(HB10 ~ env, data = beedata)
+
 # FIGURE 5 -----------------------------------
 graph_data <- bee_longplot
-N_s <- table(subset(graph_data, env=="s")$trait)
-N_c <- table(subset(graph_data, env=="c")$trait)
-# Sample size is 36 for simple and 34 for complex across all traits
 ggplot(graph_data, aes(x = trait, y = zscore, fill = env)) +
   geom_boxplot(coef = Inf
                , position = position_dodge(width = 0.75)
@@ -516,30 +520,34 @@ TukeyHSD(trialmod)
 # We use one data point per bee, the proportion of time landing/solving. 
 
 # On landing:
-model_SRI_landed <- lm(prop_landed ~ SRI, data = beedata)
-model_HB10_landed <- lm(prop_landed ~ HB10, data = beedata)
-model_resp_landed <- lm(prop_landed ~ resp, data = beedata)
 model_firsthandl_landed <- lm(prop_landed ~ H_F1_T1, data = beedata)
 model_searchtime_landed <- lm(prop_landed ~ tot_search12, data = beedata)
+model_travel <- lm(prop_landed ~ avgtravel, data = beedata)
+model_SRI_landed <- lm(prop_landed ~ SRI, data = beedata)
+model_resp_landed <- lm(prop_landed ~ resp, data = beedata)
+model_HB10_landed <- lm(prop_landed ~ HB10, data = beedata)
 
 summary(model_firsthandl_landed)
+summary(model_travel)
 summary(model_searchtime_landed) # only one sign
 summary(model_SRI_landed)
 summary(model_resp_landed)
 summary(model_HB10_landed)
 
 # On solving:
-model_SRI_solved <- lm(prop_solved ~ SRI, data = beedata)
-model_HB10_solved <- lm(prop_solved ~ HB10, data = beedata)
-model_resp_solved <- lm(prop_solved ~ resp, data = beedata)
 model_firsthandl_solved <- lm(prop_solved ~ H_F1_T1, data = beedata)
 model_searchtime_solved <- lm(prop_solved ~ tot_search12, data = beedata)
+model_travel_solved <- lm(prop_solved ~ avgtravel, data = beedata)
+model_SRI_solved <- lm(prop_solved ~ SRI, data = beedata)
+model_resp_solved <- lm(prop_solved ~ resp, data = beedata)
+model_HB10_solved <- lm(prop_solved ~ HB10, data = beedata)
+
 summary(model_firsthandl_solved)
 summary(model_searchtime_solved) # only one sign
+summary(model_travel_solved)
 summary(model_SRI_solved)
 summary(model_resp_solved)
 summary(model_HB10_solved)
-
 
 # FIGURE S3 ------------------------------------------
 ggplot(bee_longplot, aes(x = score, y = prop, color = env)) +
@@ -606,7 +614,7 @@ ggplot(bee_longplot, aes(x = score, y = prop, color = env)) +
 # (flower types) separately, thus multiple measurements per bee; 
 # but only trials in which the bee actually solved (i.e. accessed reward).
 
-# Handling time of first flower
+# Handling time of first flower: Table S5 ------------------------
 hand_lm <- lm(logtime ~ log(H_F1_T1) * trial, data = innovationsuccess)
 summary(hand_lm)
 # Close to sign
@@ -624,11 +632,10 @@ tab_model(hand_lm
           , dv.labels = "Effect on solving time"
 )
 
-
-# Search time in first two innovation trials on solving time in those trials
-searchmod <- lm(logtime ~ log(search_time) * trial, data = bumpy_folded_search)
+# Search time in first two innovation trials: Table S6 ---------------
+searchmod <- lm(logtime ~ log(tot_search12) * trial, data = innovationsuccess)
 summary(searchmod)
-tab_model(hand_lm
+tab_model(searchmod
           , show.re.var = TRUE
           , pred.labels = c("Intercept",
                             "Search time on B&F",
@@ -642,8 +649,24 @@ tab_model(hand_lm
           , dv.labels = "Effect on solving time"
 )
 
+# Travel time in pretrials: Table S7 ---------------
+travelmod <- lm(logtime ~ log(avgtravel) * trial, data = innovationsuccess)
+summary(travelmod)
+tab_model(travelmod
+          , show.re.var = TRUE
+          , pred.labels = c("Intercept",
+                            "Travel in trial 2-4",
+                            "Trial (Folded vs Bumpy)",
+                            "Trial (Cap1 vs Bumpy)",
+                            "Trial (Cap2 vs Bumpy)",
+                            "Travel x Trial (Folded)",
+                            "Travel x Trial (Cap1)",
+                            "Travel x Trial (Cap2)"
+          )
+          , dv.labels = "Effect on solving time"
+)
 
-# SRI (routine formation)
+# SRI (routine formation): Table S8 ------------------------------
 sri_lm <- lm(logtime ~ SRI * trial, data = innovationsuccess)
 summary(sri_lm)
 # Sign SRI and interaction SRI x trialCap1
@@ -661,7 +684,7 @@ tab_model(sri_lm
           , dv.labels = "Effect on solving time"
 )
 
-# Responsiveness
+# Responsiveness: Table S9 -----------------------------
 resp_lm <- lm(logtime ~ resp * trial, data = innovationsuccess)
 summary(resp_lm)
 # Sign interaction resp x trialFolded
@@ -679,8 +702,8 @@ tab_model(resp_lm
           , dv.labels = "Effect on solving time"
 )
 
-# Exploration
-exp_lm <- lm(logtime ~ HB10 * trial,data = innovationsuccess)
+# Exploration: Table S10 -----------------------------
+exp_lm <- lm(logtime ~ HB10 * trial, data = innovationsuccess)
 summary(exp_lm)
 # Not sign
 tab_model(exp_lm
