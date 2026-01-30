@@ -14,7 +14,7 @@ library(coxme)
 library(stringdist)
 library(tidyverse)
 library(scales)  # for number_format
-library(sjPlot)
+library(sjPlot) # for nice model output tables
 library(ggh4x) #for formatting individual x-axes in grid plot
 # Graphics setup -----------------------------
 
@@ -125,38 +125,6 @@ innovationlong <- beedata %>%
   ))
 
 innovationlong$trial <- factor(innovationlong$trial, levels = c("Bumpy", "Folded", "Cap1", "Cap2"))
-
-# Descriptive (Fig S5?):
-hist(innovationlong$time
-     , xlab = "Time to solve [s]"
-     , main = "Distribution of 'Innovation' outcomes across all trials")
-#ggplot version with line at median
-ggplot(
-  innovationlong |> dplyr::filter(!is.na(time), time > 0),
-  aes(x = time)
-) +
-  geom_histogram(
-    bins = 10,
-    fill = "grey80",
-    color = "black"
-  ) +
-  geom_vline(
-    xintercept = median(innovationlong$time[innovationlong$time > 0], na.rm = TRUE),
-    linetype = "dashed",
-    linewidth = 0.8
-  ) +
-  scale_x_continuous(
-    limits = c(0.5, NA),
-    breaks = seq(0, 60, by = 10)
-  ) +
-  labs(
-    title = "Distribution of innovation solving times across all trials",
-    x = "Time to solve (s)",
-    y = "Frequency"
-  ) +
-  theme_classic(base_size = 14)
-# Note that time to solve has a steeply decreasing, long tail distribution -
-# suitable for a log transformation
 innovationlong$logtime <- log(innovationlong$time)
 
 ## Now we have all the data in long format - one bee trial per row - and in 
@@ -175,6 +143,43 @@ abandonedinnovation <- beedata %>%
 
 ## Subsets --------------------------------------------------
 
+# Removing columns we don't need or that repeat information
+# Long format: one row per trial (=trip), multiple per bee
+innovationlong <- innovationlong %>% 
+  select(
+    BeeID,
+    colony,
+    env,
+    trial, 
+    landed, solve,
+    time,
+    logtime,
+    SRI, resp, HB10, H_F1_T1, tot_search12,
+    F1search, F2search
+  )
+abandonedinnovation <- abandonedinnovation %>% 
+  select(
+    BeeID,
+    colony,
+    env,
+    trial, 
+    givinguptime,
+    SRI, resp, HB10, H_F1_T1, tot_search12,
+    F1search, F2search
+  )
+
+# Wide format: one row per bee, with columns for each trait
+# We don't need information for each trial any more for this dataset.
+beedata <- beedata %>%
+  select(
+    BeeID,
+    colony,
+    env,
+    prop_landed, prop_solved, 
+    avg_time,
+    SRI, resp, HB10, H_F1_T1, tot_search12, AvgPre
+  )
+
 # Removing observations where the bee did not visit the flower
 innovationlanded <- innovationlong %>%
   filter(landed != 0)
@@ -182,6 +187,31 @@ innovationlanded <- innovationlong %>%
 # Make data frame for just the time to solve 
 innovationsuccess <- innovationlanded %>%
   filter(solve != 0)
+
+# Descriptive (Fig S1):
+ggplot(innovationsuccess
+       , aes(x = time)
+) + 
+  geom_histogram(
+    breaks=seq(0.1, 60.1, by = 5),
+    fill = "grey80",
+    color = "black"
+  ) +
+  geom_vline(
+    xintercept = median(innovationlong$time[innovationlong$time > 0], na.rm = TRUE),
+    linetype = "dashed",
+    linewidth = 0.8
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 60, by = 10)
+  ) +
+  labs(
+    x = "Time to solve [s]",
+    y = "Frequency"
+  ) +
+  theme_classic(base_size = 14)
+# Note that time to solve has a steeply decreasing, long tail distribution -
+# suitable for a log transformation
 
 
 #### SUMMARIES ------------------------------
@@ -335,7 +365,7 @@ ggplot(plot_data, aes(x = env, y = count, fill = outcome)) +
 
 
 # On time to solve: -------------------------------
-lm_time_to_solve <- lm(logtime ~ env + trial, data = innovationsuccess)
+lm_time_to_solve <- lm(logtime ~ env * trial, data = innovationsuccess)
 summary(lm_time_to_solve)
 tab_model(lm_time_to_solve
           , show.re.var = TRUE
@@ -343,7 +373,10 @@ tab_model(lm_time_to_solve
                             "Environment (complex vs simple)",
                             "Trial (Folded vs Bumpy)",
                             "Trial (Cap1 vs Bumpy)",
-                            "Trial (Cap2 vs Bumpy)"
+                            "Trial (Cap2 vs Bumpy)",
+                            "Env x Trial (Folded)",
+                            "Env x Trial (Cap1)",
+                            "Env x Trial (Cap2)"
           )
           , dv.labels = "Effect on time to solve (reach reward) on novel flower"
 )
@@ -357,10 +390,10 @@ offset <- 0.2
 N_s <- table(subset(graph_data, env=="s")$trial)
 N_c <- table(subset(graph_data, env=="c")$trial)
 
-### ggplot version
 ggplot(graph_data, aes(x = factor(trial, levels = c("Bumpy", "Folded", "Cap1", "Cap2")),
                        y = time, fill = env)) +
   geom_boxplot(coef = Inf, position = position_dodge(width = 0.75)) +
+  scale_y_log10() +
   scale_fill_manual(
     values = c("s" = simplecomplexcolors[1], "c" = simplecomplexcolors[2]),
     labels = c("Simple", "Complex"),
@@ -379,14 +412,14 @@ ggplot(graph_data, aes(x = factor(trial, levels = c("Bumpy", "Folded", "Cap1", "
   annotate("text", x = 2, y = ymax + 2, label = "A", size = 5, color = "black") +
   annotate("text", x = 3, y = ymax + 2, label = "B", size = 5, color = "black") +
   annotate("text", x = 4, y = ymax + 2, label = "B", size = 5, color = "black") +
-  annotate("text", x = 1+offset, y = - 2, label = N_c[[1]], size = 5, color = simcomcolors_dark[2]) +
-  annotate("text", x = 2+offset, y = - 2, label = N_c[[2]], size = 5, color = simcomcolors_dark[2]) +
-  annotate("text", x = 3+offset, y = - 2, label = N_c[[3]], size = 5, color = simcomcolors_dark[2]) +
-  annotate("text", x = 4+offset, y = - 2, label = N_c[[4]], size = 5, color = simcomcolors_dark[2]) +
-  annotate("text", x = 1-offset, y = - 2, label = N_s[[1]], size = 5, color = simcomcolors_dark[1]) +
-  annotate("text", x = 2-offset, y = - 2, label = N_s[[2]], size = 5, color = simcomcolors_dark[1]) +
-  annotate("text", x = 3-offset, y = - 2, label = N_s[[3]], size = 5, color = simcomcolors_dark[1]) +
-  annotate("text", x = 4-offset, y = - 2, label = N_s[[4]], size = 5, color = simcomcolors_dark[1]) 
+  annotate("text", x = 1+offset, y = 0.9, label = N_c[[1]], size = 5, color = simcomcolors_dark[2]) +
+  annotate("text", x = 2+offset, y = 0.9, label = N_c[[2]], size = 5, color = simcomcolors_dark[2]) +
+  annotate("text", x = 3+offset, y = 0.9, label = N_c[[3]], size = 5, color = simcomcolors_dark[2]) +
+  annotate("text", x = 4+offset, y = 0.9, label = N_c[[4]], size = 5, color = simcomcolors_dark[2]) +
+  annotate("text", x = 1-offset, y = 0.9, label = N_s[[1]], size = 5, color = simcomcolors_dark[1]) +
+  annotate("text", x = 2-offset, y = 0.9, label = N_s[[2]], size = 5, color = simcomcolors_dark[1]) +
+  annotate("text", x = 3-offset, y = 0.9, label = N_s[[3]], size = 5, color = simcomcolors_dark[1]) +
+  annotate("text", x = 4-offset, y = 0.9, label = N_s[[4]], size = 5, color = simcomcolors_dark[1]) 
 
 
 # On time to give up: ---------------------------------------------
@@ -404,30 +437,14 @@ tab_model(lm_abandoning
           , dv.labels = "Effect on abandoning flower without solving"
 )
 
-# FIGURE S1 --------------------------------------------------
-## Would be nice to do the same formatted plot as for innovation time here
-##!!!!!!!!!!!!!!!!!
-
+# FIGURE S2 --------------------------------------------------
 graph_data <- subset(abandonedinnovation, givinguptime >0)
 graph_data$trial_factor <- factor(graph_data$trial, levels = c("Bumpy", "Folded", "Cap1", "Cap2"))
-ymax <- max(graph_data$givinguptime)
-offset <- 0.2
 N_s <- table(subset(graph_data, env=="s")$trial_factor)
 N_c <- table(subset(graph_data, env=="c")$trial_factor)
 
-Nice_Plot <- boxplot(givinguptime ~ trial_factor, data = graph_data)
-nbGroup <- nlevels(as.factor(Nice_Plot$names))
-text( 
-  x=c(1:nbGroup), 
-  y=ymax*1.1,
-  cex = 1,
-  paste(Nice_Plot$n,sep="")
-  , xpd=TRUE
-#  , col = color_with_memory  
-)
-### ggplot version
 ggplot(graph_data, aes(x = trial_factor,
-                       y = givinguptime, fill = factor(Env, levels = c("s", "c")))) +
+                       y = givinguptime, fill = factor(env, levels = c("s", "c")))) +
   geom_boxplot(position = position_dodge(width = 0.75)) +
   scale_fill_manual(
     values = c("s" = simplecomplexcolors[1], "c" = simplecomplexcolors[2]),
@@ -435,7 +452,7 @@ ggplot(graph_data, aes(x = trial_factor,
     name = "Environment"
   )+
   theme_minimal() +
-  labs(x = "Trial", y = "Time to give up") +
+  labs(x = "Trial", y = "Time to give up [s]") +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1, size = 14),
     axis.text.y = element_text(size = 14),
@@ -443,10 +460,6 @@ ggplot(graph_data, aes(x = trial_factor,
     legend.text = element_text(size = 14),
     legend.title = element_text(size = 16)
   ) +
-  annotate("text", x = 1, y = ymax + 2, label = "A", size = 5, color = "black") +
-  annotate("text", x = 2, y = ymax + 2, label = "A", size = 5, color = "black") +
-  annotate("text", x = 3, y = ymax + 2, label = "B", size = 5, color = "black") +
-  annotate("text", x = 4, y = ymax + 2, label = "B", size = 5, color = "black") +
   annotate("text", x = 1+offset, y = - 2, label = N_c[[1]], size = 5, color = simcomcolors_dark[2]) +
   annotate("text", x = 2+offset, y = - 2, label = N_c[[2]], size = 5, color = simcomcolors_dark[2]) +
   annotate("text", x = 3+offset, y = - 2, label = N_c[[3]], size = 5, color = simcomcolors_dark[2]) +
@@ -457,21 +470,6 @@ ggplot(graph_data, aes(x = trial_factor,
   annotate("text", x = 4-offset, y = - 2, label = N_s[[4]], size = 5, color = simcomcolors_dark[1]) 
 
 
-# On time to give up: ---------------------------------------------
-lm_abandoning <- lm(givinguptime ~ env + trial, 
-                    data = abandonedinnovation)
-summary(lm_abandoning)
-tab_model(lm_abandoning
-          , show.re.var = TRUE
-          , pred.labels = c("Intercept",
-                            "Environment (complex vs simple)",
-                            "Trial (Folded vs Bumpy)",
-                            "Trial (Cap1 vs Bumpy)",
-                            "Trial (Cap2 vs Bumpy)"
-          )
-          , dv.labels = "Effect on abandoning flower without solving"
-)
-
 # On search time: -------------------------------
 bee_avg_search <- bumpy_folded_search %>%
   group_by(BeeID, env) %>%
@@ -479,12 +477,15 @@ bee_avg_search <- bumpy_folded_search %>%
 
 wilcox.test(mean_search ~ env, data = bee_avg_search)
 
-# FIGURE S2 ---------------------------------------
+# FIGURE S3 ---------------------------------------
+N_s <- sum(bee_avg_search$env == "s")
+N_c <- sum(bee_avg_search$env == "c")
+
 ggplot(bee_avg_search, aes(x = env, y = mean_search, fill = env)) +
   geom_boxplot(width = 0.6, alpha = 0.7, coef = Inf) +
   labs(
     x = "Environment *",
-    y = "Mean search time per bee"
+    y = "Mean search time per bee [s]"
   ) +
   scale_fill_manual(
     values = c("s" = simplecomplexcolors[1], "c" = simplecomplexcolors[2]),
@@ -496,9 +497,10 @@ ggplot(bee_avg_search, aes(x = env, y = mean_search, fill = env)) +
     axis.title = element_text(size = 22),
     axis.text = element_text(size = 20),
     legend.position = "none",
-  )
-# !!!!! Add sample sizes
-
+  ) +
+annotate("text", x = 1+offset, y = 150, label = N_s, size = 5, color = simcomcolors_dark[1]) +
+annotate("text", x = 2+offset, y = 150, label = N_c, size = 5, color = simcomcolors_dark[2])
+  
 #### EFFECT OF FLOWER TYPE ----------------------------
 # On time to solve:
 trialmod <- aov(logtime ~ trial, data = innovationsuccess)
@@ -508,8 +510,7 @@ TukeyHSD(trialmod)
 #### EFFECT OF BEE TRAITS ----------------------------
 
 # For landing (yes/no) and solving (yes/no) ---------------
-# Wwe use one data point per bee, to 
-# calculate proportion of time landing/solving. 
+# We use one data point per bee, the proportion of time landing/solving. 
 
 # On landing:
 model_SRI_landed <- lm(prop_landed ~ SRI, data = beedata)
@@ -538,11 +539,12 @@ summary(model_HB10_solved)
 
 
 # FIGURE S3 ------------------------------------------
-## This needs work (see manuscript)
-
+# Changing factor labels to be clearer and fit on axes
+levels(bee_longplot$trait) <- c("First handling", "Search time", "Routine", "Responsiveness", "Exploration")
+levels(bee_longplot$outcome) <- c("Prop. trials landed", "Prop. trials solved")
 ggplot(bee_longplot, aes(x = score, y = prop, color = env)) +
   geom_point(alpha = 0.7) +
-  geom_smooth(aes(group = 1), method = "lm", se = FALSE, color = "black") +
+  geom_smooth(aes(group = 1), method = "lm", se = FALSE, color = alpha("black", 0.2)) +
   facet_grid(
     rows = vars(outcome),
     cols = vars(trait),
@@ -552,7 +554,7 @@ ggplot(bee_longplot, aes(x = score, y = prop, color = env)) +
   ggh4x::facetted_pos_scales(
     x = list(
       # FORCE 0 to appear + axis starts at 0 for this facet
-      trait == "First handling time" ~ scale_x_continuous(
+      trait == "First handling" ~ scale_x_continuous(
         limits = c(0, NA),
         breaks = c(0, 5, 10, 15, 20),
         labels = label_number(accuracy = 1)
@@ -563,7 +565,7 @@ ggplot(bee_longplot, aes(x = score, y = prop, color = env)) +
         labels = label_number(big.mark = ",", accuracy = 1)
       ),
       
-      trait == "Routine formation (SRI)" ~ scale_x_continuous(
+      trait == "Routine" ~ scale_x_continuous(
         breaks = c(0.3, 0.5, 0.7),
         labels = label_number(accuracy = 0.1)
       ),
@@ -589,7 +591,7 @@ ggplot(bee_longplot, aes(x = score, y = prop, color = env)) +
   theme(
     strip.placement = "outside",
     strip.text.y.left = element_text(angle = 90, size = 14),
-    strip.text.x = element_text(size = 14),
+    strip.text.x = element_text(size = 10),
     axis.title = element_text(size = 14),
     axis.text.x = element_text(size = 10, angle = 45, hjust = 1),
     axis.text.y = element_text(size = 12),
@@ -644,6 +646,19 @@ tab_model(resp_lm
 exp_lm <- lm(logtime ~ HB10 * trial,data = innovationsuccess)
 summary(exp_lm)
 # Not sign
+tab_model(exp_lm
+          , show.re.var = TRUE
+          , pred.labels = c("Intercept",
+                            "Exploration",
+                            "Trial (Folded vs Bumpy)",
+                            "Trial (Cap1 vs Bumpy)",
+                            "Trial (Cap2 vs Bumpy)",
+                            "Expl x Trial (Folded)",
+                            "Expl x Trial (Cap1)",
+                            "Expl x Trial (Cap2)"
+          )
+          , dv.labels = "Effect on solving time"
+)
 
 # Handling time of first flower
 hand_lm <- lm(logtime ~ log(H_F1_T1) * trial, data = innovationsuccess)
@@ -668,31 +683,32 @@ searchmod <- lm(logtime ~ log(search_time) * trial, data = bumpy_folded_search)
 summary(searchmod)
 # !! Shouldn't we use avg innovation time as above?
 # Not sign
+# !!! Reorder traits to match manuscript
 
 # FIGURE 5 ---------------------------------------------
-# !!!!! should all vertical in a row
-# Would it be better to plot solving time on log axis, and/or 
-# with error bars? 
-# Units on x-axis reformatted?
-ggplot(bee_longplot, aes(x = score, y = avg_time, color = env)) +
-  geom_point(alpha = 0.7) +
-  geom_smooth(method = "lm", se = TRUE) +
+ggplot(bee_longplot, aes(x = score, y = avg_time
+#                         , color = env
+                         )) +
+  geom_smooth(method = "lm", se = TRUE
+              , color = alpha("black", 0.2)
+              , fill = alpha("grey", 0.05)) +
+  geom_point(color = "darkblue", alpha = 0.2) +
   facet_wrap(~ trait, scales = "free_x", nrow = 1) +
   scale_y_log10() +
   scale_color_manual(
-    values = c("s" = simcomcolors_dark[1], 
-               "c" = simcomcolors_dark[2]),
-    labels = c("Simple", "Complex"),
-    name = "Environment"
+#    values = c("s" = simcomcolors_dark[1], 
+#               "c" = simcomcolors_dark[2]),
+#    labels = c("Simple", "Complex"),
+#    name = "Environment"
   ) +
   labs(
-    x = NULL,
-    y = "Mean solving time for each bee (s, log scale)"
+    x = "Trait score",
+    y = "Mean solving time [s]"
   ) +
   theme_minimal(base_size = 16) +
   theme(
     axis.title.y = element_text(size = 22),
-    axis.text = element_text(size = 10),
+    axis.text = element_text(size = 8),
     legend.title = element_text(size = 12),
     legend.text = element_text(size = 10)
   )
