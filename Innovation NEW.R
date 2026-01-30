@@ -55,9 +55,6 @@ beedata <- rawdata
 #colony: colony id
 no_bees <- length(unique(beedata$BeeID))
 
-# Calculate average time spent traveling over trips 2-4 in the pre-training 
-beedata$AvgPre <- rowMeans(beedata[,c("T2_T","T3_T","T4_T")], na.rm=TRUE)
-
 # Calculate SRI for each bee and add it to the temp dataset
 beedata <- beedata %>%
   group_by(BeeID) %>%
@@ -72,11 +69,13 @@ beedata$env <- factor(beedata$Env, levels = c("s", "c"))
 # Calculating additional summary statistics
 #  Flower1search: time to alight on first novel flower
 #  Flower1handling: time spent drinking (head in first novel flower)
-#  resp: responsiveness
-beedata$resp <- (beedata$T5travel - beedata$AvgPre)/beedata$AvgPre #differences between travel times for trip 5 and avg of trips before
 beedata$F1search <- beedata$Flower1search
 beedata$F2search <- beedata$Flower2search
 beedata$tot_search12 <- beedata$F1search + beedata$F2search
+# Calculate average time spent traveling over trips 2-4 in the pre-training 
+beedata$avgtravel <- rowMeans(beedata[,c("T2_T","T3_T","T4_T")], na.rm=TRUE)
+#  resp: responsiveness
+beedata$resp <- (beedata$T5travel - beedata$avgtravel)/beedata$avgtravel #differences between travel times for trip 5 and avg of trips before
 beedata$F1solve <- as.numeric(as.factor(beedata$Flower1Solve))-1 #binary: success on 1st novel flower or not?
 beedata$F2solve <- as.numeric(as.factor(beedata$Flower2Solve))-1 #binary: success on 2nd novel flower
 beedata$cap1solve <- as.numeric(as.factor(beedata$Cap1solve))-1 #binary: success on 3rd novel flower
@@ -154,7 +153,7 @@ innovationlong <- innovationlong %>%
     landed, solve,
     time,
     logtime,
-    SRI, resp, HB10, H_F1_T1, tot_search12,
+    SRI, resp, HB10, H_F1_T1, tot_search12, avgtravel,
     F1search, F2search
   )
 abandonedinnovation <- abandonedinnovation %>% 
@@ -164,7 +163,7 @@ abandonedinnovation <- abandonedinnovation %>%
     env,
     trial, 
     givinguptime,
-    SRI, resp, HB10, H_F1_T1, tot_search12,
+    SRI, resp, HB10, H_F1_T1, tot_search12, avgtravel,
     F1search, F2search
   )
 
@@ -177,7 +176,7 @@ beedata <- beedata %>%
     env,
     prop_landed, prop_solved, 
     avg_time,
-    SRI, resp, HB10, H_F1_T1, tot_search12, AvgPre
+    SRI, resp, HB10, H_F1_T1, tot_search12, avgtravel
   )
 
 # Removing observations where the bee did not visit the flower
@@ -221,39 +220,49 @@ mean_times <- innovationsuccess %>%
   group_by(trial) %>%
   summarise(mean_time = mean(time, na.rm = TRUE))
 
-# Search time in first two innovation trials
-bumpy_folded_search <- innovationlanded %>%
-  filter(trial %in% c("Bumpy", "Folded")) %>%
-  mutate(
-    search_time = case_when(
-      trial == "Bumpy"  ~ F1search,
-      trial == "Folded" ~ F2search
-    )
-  ) %>%
-  select(BeeID, trial, search_time, everything())
-
 # Another version of per-bee (wide) data table, with traits
 # Reshape per-bee values for faceted plot
 bee_longplot <- beedata %>%
-  pivot_longer(cols = c(SRI, resp, HB10, H_F1_T1, tot_search12), names_to = "trait", values_to = "score") %>%
+  pivot_longer(cols = c(H_F1_T1, tot_search12, avgtravel, SRI, resp, HB10), names_to = "trait", values_to = "score") %>%
   pivot_longer(cols = c(prop_landed, prop_solved), names_to = "outcome", values_to = "prop") %>%
   mutate(trait = recode(trait,
-                        SRI = "Routine formation (SRI)",
+                        H_F1_T1 = "First handling",
+                        tot_search12 = "Search time",
+                        avgtravel = "Travel time",
+                        SRI = "Routine",
                         resp = "Responsiveness",
-                        HB10 = "Exploration",
-                        H_F1_T1 = "First handling time",
-                        tot_search12 = "Search Time")
+                        HB10 = "Exploration"
+                        )
          , outcome = recode(outcome,
-                            prop_landed = "Proportion landed",
-                            prop_solved = "Proportion solved")
+                            prop_landed = "Prop. trials landed",
+                            prop_solved = "Prop. trials solved")
   ) %>%
-  mutate(trait = factor(trait, levels = c("First handling time",
-                                          "Search Time", 
-                                          "Routine formation (SRI)",
+  mutate(trait = factor(trait, levels = c("First handling",
+                                          "Search time", 
+                                          "Travel time",
+                                          "Routine",
                                           "Responsiveness",
                                           "Exploration"))
          , outcome = factor(outcome, levels = c("Proportion landed", "Proportion solved"))
   )
+
+meanvals <- c(mean(beedata$H_F1_T1)
+                , mean(beedata$tot_search12)
+                , mean(beedata$avgtravel)
+                , mean(beedata$SRI)
+                , mean(beedata$resp)
+                , mean(beedata$HB10)
+)
+sdvals <- c(sd(beedata$H_F1_T1)
+              , sd(beedata$tot_search12)
+              , sd(beedata$avgtravel)
+              , sd(beedata$SRI)
+              , sd(beedata$resp)
+              , sd(beedata$HB10)
+)
+#bee_longplot$difftomean <- (bee_longplot$score 
+#                            - meanvals[bee_longplot$trait])
+bee_longplot$zscore <- (bee_longplot$score - meanvals[bee_longplot$trait])/sdvals[bee_longplot$trait]
 
 ## ANALYSES -------------------------------------------
 
@@ -390,8 +399,7 @@ offset <- 0.2
 N_s <- table(subset(graph_data, env=="s")$trial)
 N_c <- table(subset(graph_data, env=="c")$trial)
 
-ggplot(graph_data, aes(x = factor(trial, levels = c("Bumpy", "Folded", "Cap1", "Cap2")),
-                       y = time, fill = env)) +
+ggplot(graph_data, aes(x = trial, y = time, fill = env)) +
   geom_boxplot(coef = Inf, position = position_dodge(width = 0.75)) +
   scale_y_log10() +
   scale_fill_manual(
@@ -450,7 +458,7 @@ ggplot(graph_data, aes(x = trial_factor,
     values = c("s" = simplecomplexcolors[1], "c" = simplecomplexcolors[2]),
     labels = c("Simple", "Complex"),
     name = "Environment"
-  )+
+  ) +
   theme_minimal() +
   labs(x = "Trial", y = "Time to give up [s]") +
   theme(
@@ -470,37 +478,33 @@ ggplot(graph_data, aes(x = trial_factor,
   annotate("text", x = 4-offset, y = - 2, label = N_s[[4]], size = 5, color = simcomcolors_dark[1]) 
 
 
-# On search time: -------------------------------
-bee_avg_search <- bumpy_folded_search %>%
-  group_by(BeeID, env) %>%
-  summarise(mean_search = mean(search_time, na.rm = TRUE), .groups = "drop")
-
-wilcox.test(mean_search ~ env, data = bee_avg_search)
-
-# FIGURE S3 ---------------------------------------
-N_s <- sum(bee_avg_search$env == "s")
-N_c <- sum(bee_avg_search$env == "c")
-
-ggplot(bee_avg_search, aes(x = env, y = mean_search, fill = env)) +
-  geom_boxplot(width = 0.6, alpha = 0.7, coef = Inf) +
+# On other bee traits: -------------------------------
+graph_data <- bee_longplot
+N_s <- table(subset(graph_data, env=="s")$trait)
+N_c <- table(subset(graph_data, env=="c")$trait)
+# Sample size is 36 for simple and 34 for complex across all traits
+ggplot(graph_data, aes(x = trait, y = zscore, fill = env)) +
+  geom_boxplot(coef = Inf
+               , position = position_dodge(width = 0.75)
+               , alpha = 0.7
+               ) +
   labs(
-    x = "Environment *",
-    y = "Mean search time per bee [s]"
+    x = "Environment",
+    y = "Relative trait score [(x-mean)/stdev]"
   ) +
   scale_fill_manual(
-    values = c("s" = simplecomplexcolors[1], "c" = simplecomplexcolors[2]),
-    labels = c("s" = "Simple", "c" = "Complex")
+    values = simplecomplexcolors,
+    labels = c("s" = "Simple", "c" = "Complex"),
+    name = "Environment"
   ) +
   scale_x_discrete(labels = c("s" = "Simple", "c" = "Complex")) +
-  theme_minimal(base_size = 20) +
+  theme_minimal(base_size = 16) +
   theme(
-    axis.title = element_text(size = 22),
-    axis.text = element_text(size = 20),
-    legend.position = "none",
-  ) +
-annotate("text", x = 1+offset, y = 150, label = N_s, size = 5, color = simcomcolors_dark[1]) +
-annotate("text", x = 2+offset, y = 150, label = N_c, size = 5, color = simcomcolors_dark[2])
-  
+    strip.text.x = element_text(size = 12),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 10)
+  ) 
+
 #### EFFECT OF FLOWER TYPE ----------------------------
 # On time to solve:
 trialmod <- aov(logtime ~ trial, data = innovationsuccess)
@@ -539,9 +543,6 @@ summary(model_HB10_solved)
 
 
 # FIGURE S3 ------------------------------------------
-# Changing factor labels to be clearer and fit on axes
-levels(bee_longplot$trait) <- c("First handling", "Search time", "Routine", "Responsiveness", "Exploration")
-levels(bee_longplot$outcome) <- c("Prop. trials landed", "Prop. trials solved")
 ggplot(bee_longplot, aes(x = score, y = prop, color = env)) +
   geom_point(alpha = 0.7) +
   geom_smooth(aes(group = 1), method = "lm", se = FALSE, color = alpha("black", 0.2)) +
@@ -606,6 +607,43 @@ ggplot(bee_longplot, aes(x = score, y = prop, color = env)) +
 # (flower types) separately, thus multiple measurements per bee; 
 # but only trials in which the bee actually solved (i.e. accessed reward).
 
+# Handling time of first flower
+hand_lm <- lm(logtime ~ log(H_F1_T1) * trial, data = innovationsuccess)
+summary(hand_lm)
+# Close to sign
+tab_model(hand_lm
+          , show.re.var = TRUE
+          , pred.labels = c("Intercept",
+                            "First handling time",
+                            "Trial (Folded vs Bumpy)",
+                            "Trial (Cap1 vs Bumpy)",
+                            "Trial (Cap2 vs Bumpy)",
+                            "First hand x Trial (Folded)",
+                            "First hand x Trial (Cap1)",
+                            "First hand x Trial (Cap2)"
+          )
+          , dv.labels = "Effect on solving time"
+)
+
+
+# Search time in first two innovation trials on solving time in those trials
+searchmod <- lm(logtime ~ log(search_time) * trial, data = bumpy_folded_search)
+summary(searchmod)
+tab_model(hand_lm
+          , show.re.var = TRUE
+          , pred.labels = c("Intercept",
+                            "Search time on B&F",
+                            "Trial (Folded vs Bumpy)",
+                            "Trial (Cap1 vs Bumpy)",
+                            "Trial (Cap2 vs Bumpy)",
+                            "Search x Trial (Folded)",
+                            "Search x Trial (Cap1)",
+                            "Search x Trial (Cap2)"
+          )
+          , dv.labels = "Effect on solving time"
+)
+
+
 # SRI (routine formation)
 sri_lm <- lm(logtime ~ SRI * trial, data = innovationsuccess)
 summary(sri_lm)
@@ -660,30 +698,6 @@ tab_model(exp_lm
           , dv.labels = "Effect on solving time"
 )
 
-# Handling time of first flower
-hand_lm <- lm(logtime ~ log(H_F1_T1) * trial, data = innovationsuccess)
-summary(hand_lm)
-# Close to sign
-tab_model(hand_lm
-          , show.re.var = TRUE
-          , pred.labels = c("Intercept",
-                            "First handling time",
-                            "Trial (Folded vs Bumpy)",
-                            "Trial (Cap1 vs Bumpy)",
-                            "Trial (Cap2 vs Bumpy)",
-                            "First hand x Trial (Folded)",
-                            "First hand x Trial (Cap1)",
-                            "First hand x Trial (Cap2)"
-          )
-          , dv.labels = "Effect on solving time"
-)
-
-# Search time in first two innovation trials on solving time in those trials
-searchmod <- lm(logtime ~ log(search_time) * trial, data = bumpy_folded_search)
-summary(searchmod)
-# !! Shouldn't we use avg innovation time as above?
-# Not sign
-# !!! Reorder traits to match manuscript
 
 # FIGURE 5 ---------------------------------------------
 ggplot(bee_longplot, aes(x = score, y = avg_time
