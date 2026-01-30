@@ -153,8 +153,7 @@ innovationlong <- innovationlong %>%
     landed, solve,
     time,
     logtime,
-    SRI, resp, HB10, H_F1_T1, tot_search12, avgtravel,
-    F1search, F2search
+    SRI, resp, HB10, H_F1_T1, tot_search12, avgtravel
   )
 abandonedinnovation <- abandonedinnovation %>% 
   select(
@@ -163,8 +162,7 @@ abandonedinnovation <- abandonedinnovation %>%
     env,
     trial, 
     givinguptime,
-    SRI, resp, HB10, H_F1_T1, tot_search12, avgtravel,
-    F1search, F2search
+    SRI, resp, HB10, H_F1_T1, tot_search12, avgtravel
   )
 
 # Wide format: one row per bee, with columns for each trait
@@ -243,7 +241,7 @@ bee_longplot <- beedata %>%
                                           "Routine",
                                           "Responsiveness",
                                           "Exploration"))
-         , outcome = factor(outcome, levels = c("Proportion landed", "Proportion solved"))
+         , outcome = factor(outcome, levels = c("Prop. trials landed", "Prop. trials solved"))
   )
 
 meanvals <- c(mean(beedata$H_F1_T1)
@@ -479,6 +477,7 @@ ggplot(graph_data, aes(x = trial_factor,
 
 
 # On other bee traits: -------------------------------
+# FIGURE 5 -----------------------------------
 graph_data <- bee_longplot
 N_s <- table(subset(graph_data, env=="s")$trait)
 N_c <- table(subset(graph_data, env=="c")$trait)
@@ -699,7 +698,7 @@ tab_model(exp_lm
 )
 
 
-# FIGURE 5 ---------------------------------------------
+# FIGURE 6 ---------------------------------------------
 ggplot(bee_longplot, aes(x = score, y = avg_time
 #                         , color = env
                          )) +
